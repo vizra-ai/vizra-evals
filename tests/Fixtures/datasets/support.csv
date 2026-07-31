@@ -1,0 +1,3 @@
+prompt,expected,category
+"What is your refund policy?","30 days",billing
+"Do you ship to France?",,shipping

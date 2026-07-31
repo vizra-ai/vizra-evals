@@ -1,0 +1,4 @@
+{"input": "What is your refund policy?", "expected": {"contains": "30 days"}, "category": "billing"}
+{"messages": [{"role": "user", "content": "Hi, I ordered a lamp"}, {"role": "assistant", "content": "How can I help with your order?"}, {"role": "user", "content": "Where is it?"}], "expected": "tracks the order"}
+
+{"input": "Do you ship to France?"}

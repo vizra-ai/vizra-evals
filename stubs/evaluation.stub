@@ -1,0 +1,72 @@
+<?php
+
+namespace {{ namespace }};
+
+use Laravel\Ai\Responses\AgentResponse;
+use Vizra\Evals\Dataset\Dataset;
+use Vizra\Evals\Dataset\Row;
+use Vizra\Evals\Evaluation;
+
+class {{ class }} extends Evaluation
+{
+    /**
+     * How many times each row runs. Agents are nondeterministic — one sample
+     * proves nothing; results are pass rates and score distributions.
+     */
+    public int $samples = 3;
+
+    /**
+     * What gets evaluated: a Laravel\Ai agent class-string, an agent
+     * instance, or a Closure(Row $row): AgentResponse.
+     */
+    public function target(): mixed
+    {
+        return \App\Agents\MyAgent::class;
+    }
+
+    public function dataset(): Dataset
+    {
+        return Dataset::fromJsonl(base_path('evals/data/{{ dataFile }}.jsonl'));
+
+        // Also available:
+        // Dataset::fromCsv(base_path('evals/data/{{ dataFile }}.csv'));
+        // Dataset::fromArray([['input' => '...', 'expected' => '...']]);
+        // Dataset::fromConversations(\App\Agents\MyAgent::class)->latest()->take(50);
+    }
+
+    /**
+     * Optional provider/model matrix — each combo becomes its own series:
+     *
+     * public function across(): array
+     * {
+     *     return [
+     *         ['provider' => 'anthropic', 'model' => 'claude-sonnet-5'],
+     *         ['provider' => 'openai', 'model' => 'gpt-5'],
+     *     ];
+     * }
+     */
+    public function evaluate(Row $row, AgentResponse $response): void
+    {
+        // Cheap, deterministic checks run first. A failed ->gate() hard-fails
+        // the sample and skips the (expensive) judge below.
+        $this->assertNotEmpty()->gate();
+
+        if ($row->expected() !== null) {
+            $this->assertContains($row->expected());
+        }
+
+        // LLM-judged quality, scored 1-10 with persisted reasoning:
+        $this->judge()
+            ->criteria('Answers the question accurately without inventing details.')
+            ->minScore(7);
+    }
+
+    /**
+     * Optional run-level pass/fail policy for CI:
+     *
+     * public function gatePolicy(): ?\Vizra\Evals\Run\Gate
+     * {
+     *     return \Vizra\Evals\Run\Gate::minScore(0.8);
+     * }
+     */
+}
