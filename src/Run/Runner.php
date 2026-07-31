@@ -58,7 +58,7 @@ class Runner
             ->all();
 
         $run = EvalRun::create([
-            'suite' => $evaluation::class,
+            'suite' => $evaluation->suite(),
             'name' => $evaluation->name(),
             'status' => EvalRun::STATUS_RUNNING,
             ...collect(Git::capture())->mapWithKeys(fn ($value, $key) => ['git_'.$key => $value])->all(),

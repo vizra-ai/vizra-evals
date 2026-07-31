@@ -61,6 +61,16 @@ abstract class Evaluation
         return class_basename(static::class);
     }
 
+    /**
+     * The identity results are recorded under (and baselines joined on).
+     * Class-based evaluations use their FQCN; inline Pest evals override
+     * this with the test's name.
+     */
+    public function suite(): string
+    {
+        return static::class;
+    }
+
     public function description(): string
     {
         return '';
@@ -144,6 +154,17 @@ abstract class Evaluation
         };
 
         return $this->collectorOrFail()->deferJudge(new JudgeBuilder($subject, $this->row()));
+    }
+
+    /**
+     * @internal Passthrough for the Pest AssertionProxy, which lives outside
+     * this class but drives the same protected helpers.
+     *
+     * @param  array<int, mixed>  $arguments
+     */
+    public function runAssertion(string $helper, array $arguments): AssertionResult
+    {
+        return $this->{$helper}(...$arguments);
     }
 
     protected function response(): AgentResponse

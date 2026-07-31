@@ -1,224 +1,135 @@
 # Vizra Evals
 
-Evaluation framework for AI agents built on the official [Laravel AI SDK](https://github.com/laravel/ai) (`laravel/ai`).
+**Write agent evals as Pest tests. Keep every result.**
 
-Evals are not unit tests. Agents are nondeterministic, so Vizra Evals never draws a conclusion from a single run: every row is **sampled N times**, results are **scores and pass rates** rather than single booleans, every run is **persisted to your database**, and the core workflow is **comparing a run against a baseline** — which is what makes it useful in CI.
+Pest tells you whether your AI agent passed *today*. Vizra Evals records every run — sampled scores, pass rates, judge reasoning, tool calls, cost — so you can hold a baseline, fail CI on regressions, and watch quality trend over time in a dashboard. Built for agents on the official [Laravel AI SDK](https://github.com/laravel/ai).
 
-```
-composer require vizra/evals
-php artisan vendor:publish --tag=evals-config
+```bash
+composer require vizra/evals --dev
 php artisan migrate
 ```
 
-Requires PHP 8.3+, Laravel 12+, and `laravel/ai`.
+Requires PHP 8.4+, Laravel 12+, `laravel/ai`, and Pest 5 for the testing surface (a standalone CLI exists too — see below).
 
-## Five-minute quickstart
+## The five-minute version
 
-**1. Generate an evaluation** (creates the class and a starter JSONL dataset):
-
-```
-php artisan make:eval SupportQuality
-```
-
-**2. Point it at your agent and describe what "good" looks like:**
+**1. Write a Pest test:**
 
 ```php
-class SupportQuality extends Evaluation
-{
-    public int $samples = 3;
+// tests/Evals/SupportBotTest.php
 
-    public function target(): mixed
-    {
-        return SupportAgent::class;   // any Laravel\Ai agent — or an instance, or a Closure
-    }
+use App\Agents\SupportBot;
 
-    public function dataset(): Dataset
-    {
-        return Dataset::fromJsonl(base_path('evals/data/support_quality.jsonl'));
-    }
-
-    public function evaluate(Row $row, AgentResponse $response): void
-    {
-        // Cheap deterministic checks run first. A failed ->gate() hard-fails
-        // the sample and skips the judge — no tokens wasted on broken samples.
-        $this->assertFinishReason(FinishReason::Stop)->gate();
-        $this->assertToolCalled('lookup_order');
-        $this->assertCostBelow(0.02);
-
-        // Expensive judgment runs last, via a structured-output judge agent.
-        $this->judge()
-            ->criteria('Answers the customer question without inventing policy.')
-            ->minScore(7);
-    }
-}
+it('answers support questions from documented policy', function () {
+    expect(SupportBot::class)->toPassEval(fn ($eval) => $eval
+        ->dataset(base_path('evals/support.jsonl'))
+        ->samples(3)
+        ->assert(fn ($a, $row) => $a
+            ->notEmpty()->gate()
+            ->contains($row->expected())
+            ->costBelow(0.02))
+        ->judge('Answers using only documented store policy.', min: 7)
+        ->gate(minScore: 0.8, maxRegressions: 0)
+    );
+});
 ```
 
-**3. Edit the dataset.** One JSON object per line:
+**2. Give it data** — one JSON object per line:
 
 ```jsonl
 {"input": "What is your refund policy?", "expected": "30 days"}
-{"messages": [{"role": "user", "content": "Hi, I ordered a lamp"}, {"role": "assistant", "content": "How can I help?"}, {"role": "user", "content": "Where is it?"}]}
+{"messages": [{"role": "user", "content": "Hi, I ordered a lamp"}, {"role": "assistant", "content": "How can I help?"}, {"role": "user", "content": "Can I return it?"}], "expected": "30 days"}
 ```
 
-`input` is the prompt. Or give `messages` — the final user turn becomes the prompt and the earlier turns are replayed as conversation context. `expected` is free-form reference data (`$row->expected()`); any other key lands in `$row->meta()`.
+`input` is the prompt; or give `messages` and the final user turn becomes the prompt with earlier turns replayed as real conversation context. `expected` is reference data; other keys land in `$row->meta()`.
 
-**4. Wire it up without spending a token:**
+**3. Run it:**
 
-```
-php artisan evals:run SupportQuality --dry-run
-```
-
-**5. Run it for real, then make that run your baseline:**
-
-```
-php artisan evals:run SupportQuality --baseline
+```bash
+./vendor/bin/pest             # evals skipped — zero tokens, zero cost
+./vendor/bin/pest --evals     # evals run against the real model
 ```
 
-**6. In CI, compare every change against the baseline:**
+Each row runs 3 times (agents are nondeterministic — one sample proves nothing). Deterministic checks run first; a failed `->gate()` skips the LLM judge for that sample, so broken samples never spend judge tokens. Everything persists: scores, pass rates, judge reasoning, tool calls, token usage, cost.
+
+**4. Regressions fail the build.** The first passing run becomes the suite's baseline automatically. From then on, any row whose pass rate drops — or whose score falls beyond tolerance — fails the test with the receipts:
 
 ```
-php artisan evals:run SupportQuality --compare=baseline --output=json
+Eval [pest: answers support questions from documented policy] — score 61.7%, pass rate 33.3% across 6 samples (run 01kyw…).
+Gate failed: 2 rows regressed against the reference run (allowed: 0).
+  ↓ regressed: "What is your refund policy?" 96.7% → 51.7%
+  ↓ regressed: "Can I return it?" 93.3% → 55.0%
 ```
 
-Exit codes: `0` passed, `1` the gate failed or rows regressed, `2` harness failure. The JSON document is stable and versioned — parse it, archive it, chart it.
+**5. Watch it over time** — install [`vizra/evals-ui`](../vizra-evals-ui) and visit `/evals` for score trends, per-sample drill-downs with judge reasoning, and run comparisons.
 
-## Datasets
+## Inline assertions
 
-| Constructor | Use |
-|---|---|
-| `Dataset::fromJsonl($path)` | The preferred format (streamed lazily) |
-| `Dataset::fromCsv($path)` | Header row; `prompt` and `expected` columns by default — spreadsheets your non-dev teammates can edit |
-| `Dataset::fromArray([...])` | Quick starts and tests |
-| `Dataset::fromEloquent($query, fn ($model) => [...])` | Anything in your database |
-| `Dataset::fromConversations(SupportAgent::class)` | **Real production traffic** from the SDK's conversation tables |
+Inside `->assert(fn ($a, $row, $response) => ...)`, methods are chainable, and any assertion can take `->gate()` (failure hard-fails the sample, skips judges) or `->weight(float)`:
 
-`fromConversations()` turns stored conversations into multi-turn rows: the latest user turn becomes the prompt, prior turns are replayed, and the reply your agent actually gave is exposed as `$row->expected()` — ideal for `judge()->comparedTo($row->expected())`. Refine with `->latest()`, `->take(50)`, `->where(...)`.
+- **Content** — `contains`, `notContains`, `containsAnyOf`, `containsAllOf`, `startsWith`, `endsWith`, `matchesRegex`, `lengthBetween`, `wordCountBetween`, `notEmpty`, `isBritishSpelling`, `isAmericanSpelling`
+- **Structure** — `validJson`, `jsonHasKey`, `validXml`, `xmlHasTag`; structured output: `outputHasKey`, `outputKey('score', fn ($v) => $v >= 1)`, `outputKeyMatches`
+- **Agent behavior** (against the real `AgentResponse`, not text parsing) — `toolCalled`, `toolNotCalled`, `toolCalledWith('lookup_order', ['id' => 7])`, `toolCallOrder([...])`, `stepsBelow`, `finishReason(FinishReason::Stop)`, `noPendingApprovals`
+- **Usage & cost** — `costBelow`, `tokensBelow`, `cacheHitRateAbove`, `durationBelow`, `modelUsed`, `providerUsed`
+- **Safety pre-filters** — `containsNoBlockedWords`, `noObviousPII` (honest names: wordlist and regex checks, not classifiers)
 
-Rows are identified by a content hash (input + messages + expected), so the same logical row is tracked across runs even when the file is reordered.
-
-## Assertions
-
-All assertion helpers run against the **current sample** — no `$response` parameter needed. Every result records `expected` and `actual`. Any assertion can take `->gate()` (failure hard-fails the sample and skips judges) and `->weight(float)` (its share of the sample score).
-
-**Content** — `assertContains`, `assertNotContains`, `assertContainsAnyOf`, `assertContainsAllOf`, `assertStartsWith`, `assertEndsWith`, `assertMatchesRegex`, `assertLengthBetween`, `assertWordCountBetween`, `assertNotEmpty`, `assertIsBritishSpelling`, `assertIsAmericanSpelling`
-
-**Structure** — `assertValidJson`, `assertJsonHasKey`, `assertValidXml`, `assertXmlHasTag`; for structured-output agents: `assertOutputHasKey`, `assertOutputKey('score', fn ($v) => $v >= 1)`, `assertOutputKeyMatches`
-
-**Agent behavior** (the reason this package exists — assertions against the full `AgentResponse`, not just text) — `assertToolCalled`, `assertToolNotCalled`, `assertToolCalledWith('lookup_order', ['id' => 7])`, `assertToolCallOrder([...])`, `assertStepsBelow`, `assertFinishReason(FinishReason::Stop)` (flags `Length`/`ContentFilter` as truncation/refusal), `assertNoPendingApprovals`
-
-**Usage & cost** — `assertCostBelow`, `assertTokensBelow`, `assertCacheHitRateAbove`, `assertDurationBelow`, `assertModelUsed`, `assertProviderUsed`
-
-**Safety pre-filters** (named honestly: wordlist and regex checks, not classifiers) — `assertContainsNoBlockedWords`, `assertNoObviousPII`
-
-**Scalars** — `assertEquals`, `assertTrue`, `assertFalse`, `assertGreaterThan`, `assertLessThan`
-
-**Custom** — implement `Vizra\Evals\Assertions\Assertion` and call `$this->assertWith(new MyAssertion(...))`.
+Custom checks implement `Vizra\Evals\Assertions\Assertion` and run via `$a->with(new MyAssertion(...))` — or subclass `Evaluation` for the full authoring surface and point the test at it with `->using(SupportQuality::class)`.
 
 ## The judge
 
-The judge is a `laravel/ai` structured-output agent — no response parsing, no regexes. Scores are 1–10 with mandatory reasoning, and both are persisted (`eval_assertion_results.judge_reasoning` is the debugging payload).
+`->judge($criteria, min: 7)` runs a structured-output judge agent — `{score: 1–10, reasoning}` — no regex response parsing anywhere. Reasoning is persisted per sample (it's the debugging payload). Options: `dimensions: ['accuracy' => 7, 'tone' => 6]`, `provider:`/`model:` (point the judge at a *different model family* than the agent under test — models grade their own family leniently), `using: MyJudge::class`.
 
-```php
-$this->judge()
-    ->criteria('Cites the actual policy; invents nothing.')
-    ->minScore(7)
-    ->dimensions(['accuracy' => 7, 'tone' => 6])   // per-dimension minimums
-    ->weight(2.0);
+Don't trust an uncalibrated judge — feed it human-labelled data and measure agreement:
 
-// Pairwise comparison against a reference (e.g. the stored production reply):
-$this->judge()->comparedTo($row->expected())->prefer('actual');
-```
-
-Configure the judge's provider/model in `config/evals.php` (or per-builder with `->provider()` / `->model()`). **Point the judge at a different model family than the agent under test** — models grade their own family's output leniently.
-
-Judges are deferred: they run after all deterministic assertions, and are skipped entirely when a gate failed (configurable via `evals.judge.skip_on_gate_failure`).
-
-**Don't trust an uncalibrated judge.** Feed it a labelled dataset (`output` + `human_score` or `human_verdict` per row) and check agreement:
-
-```
+```bash
 php artisan evals:calibrate storage/labelled.jsonl --criteria="Correctness"
 ```
 
+## Datasets
+
+`->dataset(...)` accepts a `.jsonl`/`.csv` path, an inline array, or any `Dataset`:
+
+| | |
+|---|---|
+| `Dataset::fromJsonl($path)` | preferred format, streamed lazily |
+| `Dataset::fromCsv($path)` | spreadsheets non-devs can edit |
+| `Dataset::fromArray([...])` | quick starts |
+| `Dataset::fromEloquent($query, fn ($m) => [...])` | anything in your DB |
+| `->fromConversations(take: 50)` | **real production traffic** from the SDK's conversation tables |
+
+`fromConversations()` turns stored conversations into multi-turn rows: latest user turn becomes the prompt, prior turns replay, and the reply your agent actually gave becomes `$row->expected()`. Rows carry a content hash, so the same logical row is tracked across runs even when files are reordered.
+
 ## Scoring model
 
-- Deterministic assertions score 1.0/0.0; judge scores are normalized to 0–1; weights apply.
-- A failed gate ⇒ the sample scores 0.0, no questions asked. Passing gates are preconditions, not quality signal — they're excluded from the mean.
-- Row result = pass rate + score mean/stddev across its samples. Run result = aggregates across rows.
-- Pass/fail is a *policy applied at run level*, not something decided per assertion:
+Deterministic assertions score 1/0, judge scores normalize to 0–1, weights apply. A failed gate zeroes the sample. Row result = pass rate + score mean/stddev across samples; run result aggregates rows. Pass/fail is a **run-level policy** (`->gate(minScore:, minPassRate:, maxRegressions:)`), not a per-assertion verdict. Comparisons join rows across runs by content hash; a score drop within `evals.compare.epsilon` (default 0.05) is jitter, not a regression — pass-rate drops always count.
 
-```php
-public function gatePolicy(): ?Gate
-{
-    return new Gate(minScore: 0.8, maxRegressions: 0);
-}
+## Beyond the test suite
+
+Everything also runs without Pest — same engine, same tables, same dashboard:
+
+```bash
+php artisan evals:run SupportQuality              # class-based evaluation
+php artisan evals:run SupportQuality --dry-run    # validate wiring, zero tokens (SDK fakes)
+php artisan evals:run SupportQuality --compare=baseline --output=json   # CI without Pest
+php artisan evals:baseline {run-id}               # promote any past run
+php artisan make:eval SupportQuality              # scaffold a class + dataset
 ```
 
-CLI flags `--min-score`, `--min-pass-rate`, `--max-regressions` override per run.
+Class-based `Evaluation`s add `across()` model matrices (each provider/model combo becomes its own series), `transform()` hooks, and are what the dashboard's Run button executes. Exit codes: `0` pass, `1` gate/regression failure, `2` harness failure.
 
-## Comparing runs
+## Testing your evals without spending tokens
 
-```
-php artisan evals:run SupportQuality --compare=baseline   # or a run id, or "latest"
-php artisan evals:baseline 01JG...                        # promote any past run
-```
+The SDK's fakes work end-to-end: `SupportBot::fake([...])` (plus `Ai::fakeAgent(JudgeAgent::class, ...)` if you use judges), then run the test with `PEST_EVALS=1`. Multi-turn rows route straight to a faked agent, and `assertPrompted()` sees every prompt. The package's own 122 tests run this way — no network, no keys.
 
-Rows are joined across runs by content hash + provider/model combo. A row **regressed** if its pass rate dropped, or its mean score dropped by more than `evals.compare.epsilon` (default 0.05 — small score jitter is expected from a sampled system). `newly_failing` lists rows that were fully passing on the baseline. Regressions beyond `max_regressions` fail the run with exit code 1.
+## Configuration
 
-## Provider/model matrices
+`php artisan vendor:publish --tag=evals-config` — judge defaults, gate defaults, comparison epsilon, concurrency, table prefix, and the **user-maintained** price table that powers cost tracking (unknown models cost `null` + one warning, never an error).
 
-```php
-public function across(): array
-{
-    return [
-        ['provider' => 'anthropic', 'model' => 'claude-sonnet-5'],
-        ['provider' => 'openai', 'model' => 'gpt-5'],
-    ];
-}
-```
+## Coming from vizra-adk or pest-plugin-evals?
 
-Every combo runs the full dataset and shows up as its own series in results and comparisons.
+From **vizra-adk**: `$agentName`/`Agent::run()` → a `laravel/ai` agent target; `evaluateRow($row, string $response)` → assertions against the full `AgentResponse`; CSV results → database + dashboard; `assertNotToxic`/`assertNoPII` → honestly renamed pre-filters; sentiment/grammar/readability assertions are gone (each is one `judge()` call done properly).
 
-## Cost tracking
-
-Per-sample cost is computed from the SDK's `Usage` against the price table in `config/evals.php`. **The table is yours to maintain** — prices change and this package doesn't pretend to keep them current. Unknown models produce `null` costs and a single warning, never an error. Judge tokens are tracked separately (`judge_cost`).
-
-## Concurrency
-
-Rows × samples run concurrently through Laravel's `Concurrency` facade (default 5, `--concurrency=1` for sequential debugging). Assertions, judges, and persistence always run in the parent process. Dry runs are always sequential — agent fakes live in process memory.
-
-## Testing without spending tokens
-
-Two layers, both built on the SDK's own faking:
-
-- **`--dry-run`** on `evals:run` fakes the target agent, the judge, and everything else the run might invoke — the whole suite executes offline. Use it to validate datasets, wiring, and assertions.
-- **In your own tests**, fake the agent and (if you use `judge()`) the judge, then drive the Runner directly:
-
-```php
-SupportBot::fake(fn (string $prompt) => str_contains($prompt, 'France')
-    ? 'Yes, we ship to France.'
-    : 'Refunds within 30 days.');
-
-Ai::fakeAgent(JudgeAgent::class, fn () => ['score' => 9, 'reasoning' => 'On policy.']);
-
-$result = (new Runner(concurrencyOverride: 1))->run(new SupportBotQuality);
-
-$this->assertSame(1.0, $result->passRate());
-SupportBot::assertPrompted(fn ($prompt) => str_contains($prompt->prompt, 'refund'));
-```
-
-Fakes accept canned strings, closures, or full `TextResponse` objects with real `Usage`/`Meta`/tool calls — so cost and tool assertions are testable offline too. Multi-turn rows work with a plain agent fake: when the target agent is faked, the runner prompts it directly (fake gateways never see message history), so your canned responses and `assertPrompted` checks behave the same for single- and multi-turn rows.
-
-## Migrating from vizra-adk evaluations
-
-The authoring model survives (class-per-eval, generator, `expected`/`actual`, per-row isolation), but the model changed: string in/string out became `AgentResponse` in, and single-run pass/fail became sampled, persisted, baseline-compared runs.
-
-- `$agentName` + `Agent::run()` → `target()` returning a `laravel/ai` agent class.
-- `preparePrompt()` → `transform(Row $row): Row` (optional; use `$row->withInput()` to keep row identity).
-- `evaluateRow($row, string $response)` → `evaluate(Row $row, AgentResponse $response)`; assertion helpers no longer take the response.
-- `assertNotToxic` → `assertContainsNoBlockedWords`; `assertNoPII` → `assertNoObviousPII` (same checks, honest names).
-- **Removed:** `assertResponseHasPositiveSentiment`, `assertGrammarCorrect`, `assertReadabilityLevel` — keyword counting and hand-rolled Flesch-Kincaid measured nothing real. Each is one `judge()->criteria(...)` call away if you want it measured properly.
-- CSV results output → database persistence + `--output=json`.
-- `assertLlmJudge*` and its regex parsers → `judge()` on structured output.
+From **pest-plugin-evals**: the two coexist in one file — Nuno's expectations are quick unrecorded text checks; `toPassEval()` is for datasets, sampling, real tool-call assertions, multi-turn, and everything you want recorded.
 
 ## License
 
