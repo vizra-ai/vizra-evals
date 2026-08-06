@@ -5,6 +5,7 @@ namespace Vizra\Evals\Pest;
 use Closure;
 use InvalidArgumentException;
 use Laravel\Ai\Enums\Lab;
+use Vizra\Evals\Cloud\Reporter;
 use Vizra\Evals\Dataset\Dataset;
 use Vizra\Evals\Evaluation;
 use Vizra\Evals\Exceptions\DatasetException;
@@ -44,6 +45,8 @@ final class PendingEval
     private ?string $suite = null;
 
     private ?string $evaluationClass = null;
+
+    private bool $report = true;
 
     public function __construct(
         private readonly mixed $target,
@@ -194,7 +197,7 @@ final class PendingEval
      * @internal Executes the run and returns everything the expectation
      * needs to pass or fail the test.
      *
-     * @return array{result: RunResult, comparison: ?Comparison, gate: array{passed: bool, failures: array<int, string>}, run: EvalRun}
+     * @return array{result: RunResult, comparison: ?Comparison, gate: array{passed: bool, failures: array<int, string>}, run: EvalRun, report: ?array{ok: bool, message: string, url: ?string}}
      */
     public function run(): array
     {
@@ -214,7 +217,37 @@ final class PendingEval
         $gate = ($this->gate ?? $evaluation->gatePolicy() ?? Gate::fromConfig())
             ->evaluate($result, $comparison);
 
-        return ['result' => $result, 'comparison' => $comparison, 'gate' => $gate, 'run' => $run];
+        // Before pushToCloud() below, so the verdict is on the run by the time
+        // the payload is built.
+        $run->recordGate($gate);
+
+        return [
+            'result' => $result,
+            'comparison' => $comparison,
+            'gate' => $gate,
+            'run' => $run,
+            // Reported here rather than by the caller, because the caller
+            // fails the test on a failed gate — and a run that got worse is
+            // the one you most need in the dashboard. Pushing from inside
+            // run() makes "before the failure" structural rather than a
+            // convention someone can reorder later.
+            'report' => $this->pushToCloud($run),
+        ];
+    }
+
+    /**
+     * @return array{ok: bool, message: string, url: ?string}|null null when
+     *                                                             there is nothing to do
+     */
+    private function pushToCloud(EvalRun $run): ?array
+    {
+        if (! $this->report) {
+            return null;
+        }
+
+        $reporter = new Reporter;
+
+        return $reporter->configured() ? $reporter->report($run) : null;
     }
 
     private function buildEvaluation(): Evaluation
@@ -258,6 +291,21 @@ final class PendingEval
 
         return $this->dataset
             ?? throw new DatasetException('toPassEval() needs a dataset — call ->dataset(...) or ->fromConversations().');
+    }
+
+    /**
+     * Whether this run should be pushed to Vizra Cloud (when a key is set).
+     *
+     * Defaults to on. Turn it off for an eval that fakes the agent: those
+     * responses are canned, so the scores are real numbers describing nothing,
+     * and nothing else distinguishes them from a measurement once they are
+     * sitting in the history someone pays to trust.
+     */
+    public function report(bool $report = true): self
+    {
+        $this->report = $report;
+
+        return $this;
     }
 
     /** @internal */

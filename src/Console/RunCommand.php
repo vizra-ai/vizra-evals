@@ -5,7 +5,10 @@ namespace Vizra\Evals\Console;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Throwable;
+use Vizra\Evals\Cloud\Reporter;
+use Vizra\Evals\Dataset\Dataset;
 use Vizra\Evals\Evaluation;
 use Vizra\Evals\Models\EvalRowResult;
 use Vizra\Evals\Models\EvalRun;
@@ -26,15 +29,17 @@ class RunCommand extends Command
     public const EXIT_HARNESS_FAILURE = 2;
 
     protected $signature = 'evals:run
-        {suite? : Evaluation class name (e.g. SupportQuality) or FQCN}
-        {--all : Run every discovered evaluation}
+        {suite? : Evaluation class name (e.g. SupportQuality) or FQCN — omit to run every discovered evaluation}
         {--filter= : Filter discovered evaluations by name substring}
         {--samples= : Override the number of samples per row}
+        {--dataset= : Run a JSONL dataset instead of the one the evaluation declares}
         {--concurrency= : Number of concurrent target invocations (1 = sequential)}
         {--compare= : Compare against a run id, "baseline", or "latest"}
         {--baseline : Mark this run as the suite baseline if the gate passes}
         {--dry-run : Execute with faked agents (no network, zero tokens)}
         {--output=table : Output format: table or json}
+        {--report : Push this run to Vizra Cloud}
+        {--no-report : Never push this run to Vizra Cloud}
         {--min-score= : Run-level minimum aggregate score (0-1)}
         {--min-pass-rate= : Run-level minimum pass rate (0-1)}
         {--max-regressions= : Maximum allowed regressions when comparing}';
@@ -108,6 +113,7 @@ class RunCommand extends Command
             samplesOverride: $this->intOption('samples'),
             concurrencyOverride: $this->intOption('concurrency'),
             dryRun: (bool) $this->option('dry-run'),
+            datasetOverride: $this->datasetOverride(),
             onSample: $json ? null : function (EvalRowResult $sample) {
                 $this->output->write(match ($sample->status) {
                     EvalRowResult::STATUS_PASSED => '<fg=green>.</>',
@@ -146,6 +152,12 @@ class RunCommand extends Command
         $gate = $this->gateFor($evaluation);
         $gateOutcome = $gate->evaluate($result, $comparison);
 
+        // Persisted before the run is reported, so the verdict travels with
+        // it. Without this the gate's answer existed only as this process's
+        // exit code, and every dashboard could show a score but never say
+        // whether it was good enough.
+        $run->recordGate($gateOutcome);
+
         if ($this->option('baseline') && $gateOutcome['passed']) {
             $this->markBaseline($run);
         }
@@ -153,6 +165,8 @@ class RunCommand extends Command
         foreach ($runner->warnings() as $warning) {
             $json ? fwrite(STDERR, "[warning] {$warning}\n") : $this->components->warn($warning);
         }
+
+        $this->reportToCloud($run, $json);
 
         if ($json) {
             $this->output->writeln(json_encode(
@@ -164,6 +178,30 @@ class RunCommand extends Command
         }
 
         return $gateOutcome['passed'] ? self::SUCCESS : self::EXIT_GATE_FAILED;
+    }
+
+    /**
+     * A dataset to run in place of the evaluation's own.
+     *
+     * Useful on its own for iterating on a subset locally, and it is how
+     * Vizra Cloud runs a variant: the runner writes the rows it was handed to
+     * a file and points this at it. Rows may carry an explicit `hash`, which
+     * is honoured, so a variant keeps the identities the cloud assigned and
+     * unchanged rows still line up against the baseline.
+     */
+    private function datasetOverride(): ?Dataset
+    {
+        $path = $this->option('dataset');
+
+        if ($path === null) {
+            return null;
+        }
+
+        if (! is_file($path)) {
+            throw new RuntimeException("No dataset file at {$path}.");
+        }
+
+        return Dataset::fromJsonl($path);
     }
 
     /**
@@ -195,6 +233,50 @@ class RunCommand extends Command
             minPassRate: $this->floatOption('min-pass-rate'),
             maxRegressions: $this->intOption('max-regressions'),
         );
+    }
+
+    /**
+     * Push the run to Vizra Cloud, if it is configured.
+     *
+     * Reporting is on by default once a key exists — someone who has set one
+     * up wants their runs there, and a flag they have to remember every time
+     * is a flag they will forget in CI. `--report` forces it, `--no-report`
+     * suppresses it for a one-off local run they would rather not file.
+     *
+     * A dry run is never reported: those numbers come from faked agents and
+     * would sit in the history looking exactly like real ones.
+     */
+    private function reportToCloud(EvalRun $run, bool $json): void
+    {
+        if ($this->option('no-report') || $this->option('dry-run')) {
+            return;
+        }
+
+        $reporter = new Reporter;
+
+        if (! $reporter->configured()) {
+            if ($this->option('report')) {
+                $message = 'Vizra Cloud is not configured. Set VIZRA_CLOUD_KEY to report runs.';
+                $json ? fwrite(STDERR, "[warning] {$message}\n") : $this->components->warn($message);
+            }
+
+            return;
+        }
+
+        $outcome = $reporter->report($run);
+
+        if ($json) {
+            // stderr, so the document on stdout stays a clean parse for jq.
+            fwrite(STDERR, ($outcome['ok'] ? '[cloud] ' : '[warning] ').$outcome['message']."\n");
+
+            return;
+        }
+
+        if ($outcome['ok']) {
+            $this->components->info($outcome['url'] ?? $outcome['message']);
+        } else {
+            $this->components->warn($outcome['message']);
+        }
     }
 
     private function markBaseline(EvalRun $run): void

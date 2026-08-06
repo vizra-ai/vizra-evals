@@ -129,6 +129,42 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Vizra Cloud
+    |--------------------------------------------------------------------------
+    |
+    | Set VIZRA_CLOUD_KEY and every finished run is pushed to the hosted
+    | dashboard, giving you shared history, baselines that outlive a laptop,
+    | and PR checks. Leave it unset and nothing is sent anywhere.
+    |
+    | `samples` controls whether per-sample detail travels with the run. That
+    | detail is verbatim model input and output — it is what makes the hosted
+    | drill-down work, and it is also the one part some teams are not allowed
+    | to send off-site. Set VIZRA_CLOUD_SAMPLES=false to send scores only.
+    |
+    | Reporting never changes a run's outcome. If the upload fails you get a
+    | warning on stderr and the exit code the gate decided.
+    |
+    */
+
+    'cloud' => [
+        'endpoint' => env('VIZRA_CLOUD_ENDPOINT', 'https://vizra.ai/api/v1/runs'),
+        'key' => env('VIZRA_CLOUD_KEY'),
+        'samples' => env('VIZRA_CLOUD_SAMPLES', true),
+        'timeout' => env('VIZRA_CLOUD_TIMEOUT', 15),
+
+        // Which environment runs are filed under. Left null, anything in CI
+        // is "ci" and everything else uses APP_ENV.
+        'environment' => env('VIZRA_CLOUD_ENVIRONMENT'),
+
+        // With a key set, the package adds `evals:runner` to your scheduler
+        // for you, so the Run button in the dashboard works without you
+        // adding anything. It rides on the cron that already runs
+        // schedule:run. Set false to register it yourself instead.
+        'auto_schedule' => env('VIZRA_CLOUD_AUTO_SCHEDULE', true),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Safety Assertions
     |--------------------------------------------------------------------------
     |

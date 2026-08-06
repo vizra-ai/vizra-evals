@@ -51,6 +51,14 @@ expect()->extend('toPassEval', function (Closure $configure) {
 
     $outcome = $pending->run();
 
+    // Reporting never changes the outcome of a test — but a push that failed
+    // silently would leave someone staring at an empty dashboard with nothing
+    // to go on, which is the exact problem reporting from Pest was added to
+    // solve. stderr, so it never lands in the middle of Pest's own output.
+    if (($outcome['report'] ?? null) !== null && ! $outcome['report']['ok']) {
+        fwrite(STDERR, '[vizra-evals] '.$outcome['report']['message'].PHP_EOL);
+    }
+
     $summary = $outcome['result']->summary;
 
     // A run where every sample errored proves nothing — never let it pass,

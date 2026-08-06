@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Support\Facades\DB;
 use Laravel\Ai\Responses\StructuredAgentResponse;
 use Throwable;
+use Vizra\Evals\Dataset\Dataset;
 use Vizra\Evals\Dataset\Row;
 use Vizra\Evals\Evaluation;
 use Vizra\Evals\Events\RowEvaluated;
@@ -32,6 +33,15 @@ class Runner
         private readonly ?int $concurrencyOverride = null,
         private readonly bool $dryRun = false,
         private readonly ?Closure $onSample = null,
+        /**
+         * Run these rows instead of the ones the evaluation declares.
+         *
+         * Lets a suite be run against a variant of its dataset — a version
+         * edited in Vizra Cloud, or a subset a developer is iterating on —
+         * without touching the eval class. Everything else is unchanged: the
+         * same assertions, the same judge, the same gate.
+         */
+        private readonly ?Dataset $datasetOverride = null,
     ) {}
 
     public function run(Evaluation $evaluation): RunResult
@@ -46,7 +56,7 @@ class Runner
         $samples = max(1, $this->samplesOverride ?? $evaluation->samples);
         $concurrency = $this->concurrency();
 
-        $rows = $evaluation->dataset()->rows()
+        $rows = ($this->datasetOverride ?? $evaluation->dataset())->rows()
             ->map(function (Row $raw) use ($evaluation) {
                 $row = $evaluation->transform($raw);
 

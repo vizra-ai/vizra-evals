@@ -36,6 +36,9 @@ final class Row
      * {role, content}); `expected` (free-form). Everything else lands in meta.
      * When only `messages` is given, the trailing user turn is hoisted into
      * `input` and the remainder become prior context.
+     *
+     * An explicit `hash` is honoured rather than recomputed, so a dataset
+     * that already knows its row identities keeps them.
      */
     public static function fromArray(array|string $data, int $index = 0): self
     {
@@ -46,7 +49,16 @@ final class Row
         $input = $data['input'] ?? null;
         $messages = $data['messages'] ?? [];
         $expected = $data['expected'] ?? null;
-        $meta = Arr::except($data, ['input', 'messages', 'expected']);
+        // `hash` is identity, not data. A dataset that carries one has
+        // already decided which logical rows these are — a variant assembled
+        // elsewhere, say — and recomputing would silently rename any row we
+        // cannot reproduce byte-for-byte from content alone.
+        $hash = $data['hash'] ?? null;
+        $meta = Arr::except($data, ['input', 'messages', 'expected', 'hash']);
+
+        if ($hash !== null && (! is_string($hash) || ! preg_match('/^[a-f0-9]{64}$/', $hash))) {
+            throw new DatasetException('Row "hash" must be a sha256 hex digest.');
+        }
 
         if (! is_array($messages)) {
             throw new DatasetException('Row "messages" must be an array of {role, content} objects.');
@@ -77,7 +89,7 @@ final class Row
             throw new DatasetException('Row "input" must be a string.');
         }
 
-        return new self($input, array_values($messages), $expected, $meta, $index);
+        return new self($input, array_values($messages), $expected, $meta, $index, $hash);
     }
 
     public function isMultiTurn(): bool

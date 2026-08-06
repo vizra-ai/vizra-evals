@@ -20,6 +20,7 @@ class EvalRun extends Model
 
     protected $casts = [
         'config' => 'array',
+        'gate' => 'array',
         'summary' => 'array',
         'score' => 'float',
         'pass_rate' => 'float',
@@ -42,6 +43,21 @@ class EvalRun extends Model
     public function rowResults(): HasMany
     {
         return $this->hasMany(EvalRowResult::class, 'run_id');
+    }
+
+    /**
+     * Record what the gate decided about this run.
+     *
+     * The gate is evaluated in two places — the console command and the Pest
+     * expectation — and both need the verdict to outlive the process. It is
+     * the answer CI acted on, so a dashboard that cannot show it is left
+     * describing a score and leaving the reader to guess the threshold.
+     *
+     * @param  array{passed: bool, failures: array<int, string>}  $outcome
+     */
+    public function recordGate(array $outcome): void
+    {
+        $this->forceFill(['gate' => $outcome])->save();
     }
 
     public static function baselineFor(string $suite): ?self

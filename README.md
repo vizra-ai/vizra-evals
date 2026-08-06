@@ -119,7 +119,81 @@ Class-based `Evaluation`s add `across()` model matrices (each provider/model com
 
 ## Testing your evals without spending tokens
 
-The SDK's fakes work end-to-end: `SupportBot::fake([...])` (plus `Ai::fakeAgent(JudgeAgent::class, ...)` if you use judges), then run the test with `PEST_EVALS=1`. Multi-turn rows route straight to a faked agent, and `assertPrompted()` sees every prompt. The package's own 122 tests run this way — no network, no keys.
+The SDK's fakes work end-to-end: `SupportBot::fake([...])` (plus `Ai::fakeAgent(JudgeAgent::class, ...)` if you use judges), then run the test with `PEST_EVALS=1`. Multi-turn rows route straight to a faked agent, and `assertPrompted()` sees every prompt. The package's own 148 tests run this way — no network, no keys.
+
+## Vizra Cloud
+
+Local runs live in your own database, which means baselines live on whoever's
+laptop set them and CI has no history at all. Set one variable and every
+finished run is also pushed to the hosted dashboard:
+
+```bash
+VIZRA_CLOUD_KEY=vz_...
+```
+
+That is the whole setup. Reporting then happens automatically after every run —
+`--no-report` skips it for a one-off, and dry runs are never reported, because
+faked numbers filed in the history would look exactly like real ones.
+
+Runs from CI are filed under `ci` rather than whatever `APP_ENV` happens to be
+on the build box, and the branch and pull-request number come from the CI
+provider — GitHub Actions, GitLab, CircleCI and Buildkite are detected without
+configuration. Nothing needs to be set by hand.
+
+**Reporting cannot fail your build.** A run that passed its gate has passed it
+whether or not the upload worked; a failed upload prints a warning and leaves
+the exit code alone.
+
+### The Run button
+
+Setting the key also lets you trigger a run from the hosted dashboard, with
+nothing else to install and no line to add: the package registers
+`evals:runner` on your scheduler itself, and the cron already running
+`schedule:run` picks it up.
+
+Vizra Cloud never executes your code. It holds no model keys, no database
+credentials and no repo — a click there queues a request, your app collects it
+on its next check, and the eval runs against your environment exactly as it
+would from your terminal. Every call is outbound, so nothing has to be exposed:
+no route, no public hostname, no firewall rule. It works from staging behind a
+VPN, from a container, or from a laptop.
+
+The check runs once a minute and does nothing at all unless a run has been
+requested. If you would rather register it yourself:
+
+```bash
+VIZRA_CLOUD_AUTO_SCHEDULE=false
+```
+
+```php
+Schedule::command('evals:runner')->everyMinute()->withoutOverlapping();
+```
+
+Note that `evals:runner` only exists where this package is installed. If you
+require it with `--dev`, the Run button works in any environment that installs
+dev dependencies — which is normally where you want evals running anyway.
+
+If nothing of yours is running with cron — plenty of teams only run evals in
+CI — point Vizra Cloud at a workflow instead, from the project's settings. It
+starts the workflow, the workflow runs `evals:runner`, and that claims the same
+queued run. Nothing extra to install; the workflow is a dozen lines and the
+dashboard shows you exactly what to paste.
+
+### What gets sent
+
+Scores, timings, cost and git metadata always. Per-sample detail — the verbatim
+prompt, the model's response, tool calls and judge reasoning — is what powers
+the drill-down on the hosted run page, and is sent by default.
+
+If model output is not allowed to leave your network:
+
+```bash
+VIZRA_CLOUD_SAMPLES=false
+```
+
+You keep the trend line, the baselines, the per-row scores and the PR checks,
+and lose only the ability to click into a row and read what the model actually
+said.
 
 ## Configuration
 
@@ -133,4 +207,4 @@ From **pest-plugin-evals**: the two coexist in one file — Nuno's expectations 
 
 ## License
 
-MIT.
+MIT. See [LICENSE.md](LICENSE.md).
