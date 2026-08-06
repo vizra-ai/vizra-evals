@@ -114,6 +114,12 @@ class Payload
                 'status' => $sample->status,
                 'score' => $sample->score,
                 'input' => $sample->input,
+                // The turns before the prompt. Without these a multi-turn row
+                // cannot be reconstructed at the far end, which is what left
+                // it uneditable and unexportable in the hosted dashboard.
+                // Same category of data as `input` and `response_text`, so it
+                // travels under the same `samples` switch and no other.
+                'messages' => $sample->messages,
                 'expected' => $sample->expected,
                 'response_text' => $sample->response_text,
                 'structured_output' => $sample->structured_output,

@@ -23,6 +23,7 @@ class EvalRowResult extends Model
 
     protected $casts = [
         'combo' => 'array',
+        'messages' => 'array',
         'meta' => 'array',
         'structured_output' => 'array',
         'tool_calls' => 'array',

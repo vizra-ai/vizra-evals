@@ -198,6 +198,12 @@ class Runner
             'input' => $row->isMultiTurn()
                 ? json_encode([...$row->messages, ['role' => 'user', 'content' => $row->input]], JSON_UNESCAPED_UNICODE)
                 : $row->input,
+            // Kept apart from `input` above, which merges the whole exchange
+            // for reading. A row's identity is hashed over input, messages and
+            // expected as three separate values, so only the split form can
+            // reconstruct the row — which is what lets a multi-turn row be
+            // edited and exported rather than shown as an unusable blob.
+            'messages' => $row->messages === [] ? null : $row->messages,
             'expected' => $row->expected === null
                 ? null
                 : (is_string($row->expected) ? $row->expected : json_encode($row->expected, JSON_UNESCAPED_UNICODE)),

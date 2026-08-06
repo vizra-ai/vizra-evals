@@ -11,6 +11,8 @@ php artisan migrate
 
 Requires PHP 8.4+, Laravel 12+, `laravel/ai`, and Pest 5 for the testing surface (a standalone CLI exists too — see below).
 
+> **Install it as a regular dependency, not `--dev`, if you use Vizra Cloud's Run button.** That works by having `evals:runner` on your app's scheduler in the environment being evaluated, and `composer install --no-dev` leaves a dev requirement out. Reporting from CI is fine either way, since CI installs dev dependencies.
+
 ## The five-minute version
 
 **1. Write a Pest test:**
