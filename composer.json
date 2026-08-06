@@ -10,12 +10,26 @@
         "testing"
     ],
     "license": "MIT",
+    "homepage": "https://vizra.ai",
+    "authors": [
+        {
+            "name": "Aaron Lumsden",
+            "email": "aaron@vizra.ai",
+            "role": "Developer"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/vizra-ai/vizra-evals/issues",
+        "source": "https://github.com/vizra-ai/vizra-evals",
+        "docs": "https://docs.vizra.ai/evals"
+    },
     "require": {
         "php": "^8.4",
         "laravel/ai": "^0.10",
         "illuminate/console": "^12.0|^13.0",
         "illuminate/contracts": "^12.0|^13.0",
         "illuminate/database": "^12.0|^13.0",
+        "illuminate/http": "^12.0|^13.0",
         "illuminate/support": "^12.0|^13.0",
         "league/csv": "^9.0"
     },
@@ -61,9 +75,8 @@
         "test": "vendor/bin/pest",
         "lint": "vendor/bin/pint"
     },
-    "minimum-stability": "dev",
     "prefer-stable": true,
     "suggest": {
-        "pestphp/pest": "Write evals as Pest tests via the toPassEval() expectation (^5.0)."
+        "pestphp/pest": "Write evals as Pest tests via the toPassEval() expectation (^4.0 on Laravel 12, ^5.0 on Laravel 13)."
     }
 }

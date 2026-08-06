@@ -1,0 +1,53 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # The dependency is a 0.x SDK, and `^0.10` resolves to 0.10.x only. This run
+  # is how we find out that laravel/ai moved before somebody's install does.
+  schedule:
+    - cron: '0 6 * * 1'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.4']
+        laravel: [12, 13]
+
+    name: PHP ${{ matrix.php }} · Laravel ${{ matrix.laravel }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+
+      - name: Install dependencies
+        run: |
+          composer require "illuminate/contracts:^${{ matrix.laravel }}.0" --no-update --no-interaction
+          composer update --prefer-dist --no-interaction --no-progress
+
+      - name: Tests
+        run: vendor/bin/pest
+
+  lint:
+    runs-on: ubuntu-latest
+    name: Pint
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      - run: composer update --prefer-dist --no-interaction --no-progress
+      - run: vendor/bin/pint --test
