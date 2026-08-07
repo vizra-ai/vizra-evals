@@ -7,6 +7,7 @@ use Illuminate\Support\ServiceProvider;
 use Vizra\Evals\Console\BaselineCommand;
 use Vizra\Evals\Console\CalibrateCommand;
 use Vizra\Evals\Console\MakeCommand;
+use Vizra\Evals\Console\PingCommand;
 use Vizra\Evals\Console\RunCommand;
 use Vizra\Evals\Console\RunnerCommand;
 
@@ -47,6 +48,7 @@ class EvalsServiceProvider extends ServiceProvider
             $this->commands([
                 RunCommand::class,
                 MakeCommand::class,
+                PingCommand::class,
                 BaselineCommand::class,
                 CalibrateCommand::class,
                 RunnerCommand::class,
