@@ -133,3 +133,43 @@ it('bills a cached token at the input rate when a provider has no cache tier', f
     // charges the ordinary input rate.
     expect(Pricing::cost($usage, 'openai', 'some-model'))->toEqualWithDelta(2.0, 0.0001);
 });
+
+/*
+|--------------------------------------------------------------------------
+| Staleness
+|--------------------------------------------------------------------------
+|
+| The failure mode of a synced table is not that it breaks. It is that nobody
+| re-syncs it and it keeps answering, confidently, with last year's numbers.
+|
+*/
+
+it('says nothing while the synced table is current', function () {
+    config()->set('evals-pricing.published_at', now()->subDays(3)->format('Y-m-d H:i:s'));
+
+    expect(Pricing::staleWarning())->toBeNull();
+});
+
+it('mentions a synced table that has gone stale, once', function () {
+    config()->set('evals-pricing.published_at', now()->subDays(200)->format('Y-m-d H:i:s'));
+
+    expect(Pricing::staleWarning())
+        ->toContain('200 days old')
+        ->toContain('evals:sync-pricing');
+
+    // Once per process. A line per sample would bury the run's output.
+    expect(Pricing::staleWarning())->toBeNull();
+});
+
+it('stays quiet when nothing has ever been synced', function () {
+    config()->set('evals-pricing', []);
+
+    // Handled already by the per-model warning; saying it twice helps nobody.
+    expect(Pricing::staleWarning())->toBeNull();
+});
+
+it('stays quiet rather than throwing on an unparseable stamp', function () {
+    config()->set('evals-pricing.published_at', 'not a date');
+
+    expect(Pricing::staleWarning())->toBeNull();
+});

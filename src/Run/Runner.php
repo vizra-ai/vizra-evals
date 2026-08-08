@@ -258,9 +258,16 @@ class Runner
         }
 
         if (Pricing::shouldWarn($response->meta->provider, $response->meta->model)) {
-            $this->warnings[] = 'No pricing configured for '
+            $this->warnings[] = 'No price for '
                 .$response->meta->provider.'/'.$response->meta->model
-                .' — costs will be null. Add it to config/evals.php.';
+                .' — costs will be null. Run `php artisan evals:sync-pricing`, or add it to '
+                .'the pricing_overrides key of config/evals.php.';
+        }
+
+        // Said once per process, not once per sample. A table synced a year
+        // ago is worse than no table, because it produces confident numbers.
+        if ($stale = Pricing::staleWarning()) {
+            $this->warnings[] = $stale;
         }
 
         return DB::transaction(function () use ($base, $verdict, $error, $response, $assertions) {

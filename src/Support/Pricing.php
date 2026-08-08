@@ -2,6 +2,7 @@
 
 namespace Vizra\Evals\Support;
 
+use Illuminate\Support\Carbon;
 use Laravel\Ai\Responses\Data\Usage;
 
 /**
@@ -74,6 +75,47 @@ class Pricing
         self::$warned[$key] = true;
 
         return true;
+    }
+
+    /** How old a synced table may get before it is worth mentioning. */
+    private const STALE_AFTER_DAYS = 60;
+
+    private static bool $staleReported = false;
+
+    /**
+     * One line, once per process, when the synced table has gone stale.
+     *
+     * A price table nobody re-syncs is the failure mode this whole mechanism
+     * has — it does not break, it just quietly keeps answering with last
+     * year's numbers, and a confident wrong cost is worse than a null one.
+     * Silent while a table is current, and silent when there is none at all,
+     * because that case already warns per model.
+     */
+    public static function staleWarning(): ?string
+    {
+        if (self::$staleReported) {
+            return null;
+        }
+
+        $published = config('evals-pricing.published_at');
+
+        if (! is_string($published) || $published === '' || $published === 'unknown') {
+            return null;
+        }
+
+        try {
+            $age = (int) now()->diffInDays(Carbon::parse($published), absolute: true);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        if ($age < self::STALE_AFTER_DAYS) {
+            return null;
+        }
+
+        self::$staleReported = true;
+
+        return "Model prices are {$age} days old — run `php artisan evals:sync-pricing` to refresh them.";
     }
 
     /**
