@@ -123,6 +123,42 @@ Class-based `Evaluation`s add `across()` model matrices (each provider/model com
 
 The SDK's fakes work end-to-end: `SupportBot::fake([...])` (plus `Ai::fakeAgent(JudgeAgent::class, ...)` if you use judges), then run the test with `PEST_EVALS=1`. Multi-turn rows route straight to a faked agent, and `assertPrompted()` sees every prompt. The package's own 148 tests run this way — no network, no keys.
 
+## Keeping cost estimates honest
+
+`->costBelow(0.02)` is only as good as the prices behind it, and a table copied
+into your config at install time is wrong within a month — models get cheaper,
+new ones appear, and nothing tells you.
+
+```bash
+php artisan evals:sync-pricing        # writes config/evals-pricing.php
+```
+
+It pulls published prices from vizra.ai, which tracks them daily, and writes
+them to `config/evals-pricing.php`. **Commit that file.** Writing prices to disk
+rather than calling an API mid-run means runs stay offline, CI prices a run
+exactly as your laptop did, and a change in what your evals cost arrives as a
+reviewable diff instead of a surprise. The endpoint is public and anonymous —
+no key, and nothing about your application leaves it.
+
+Prices resolve in three layers, first match winning:
+
+| | where | for |
+|---|---|---|
+| 1 | `evals.pricing_overrides` | a negotiated rate, or a model nobody publishes |
+| 2 | `config/evals-pricing.php` | the synced table |
+| 3 | `evals.pricing` | six common models shipped with the package, so a fresh offline install still produces a number |
+
+Dated model ids resolve to their family, so `gpt-4o-2024-08-06` is priced as
+`gpt-4o`. Cached tokens use the provider's cache rate where one is published
+and the input rate where none is — which matters more here than most places,
+because a suite sends the same system prompt on every row.
+
+Run it on a schedule if you want it to stay current:
+
+```php
+Schedule::command('evals:sync-pricing')->weekly();
+```
+
 ## Vizra Cloud
 
 Local runs live in your own database, which means baselines live on whoever's
@@ -199,7 +235,7 @@ said.
 
 ## Configuration
 
-`php artisan vendor:publish --tag=evals-config` — judge defaults, gate defaults, comparison epsilon, concurrency, table prefix, and the **user-maintained** price table that powers cost tracking (unknown models cost `null` + one warning, never an error).
+`php artisan vendor:publish --tag=evals-config` — judge defaults, gate defaults, comparison epsilon, concurrency, table prefix and pricing (see below). An unpriced model costs `null` plus one warning, never an error.
 
 ## Coming from vizra-adk or pest-plugin-evals?
 

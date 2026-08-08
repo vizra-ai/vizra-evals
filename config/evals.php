@@ -104,20 +104,44 @@ return [
     | Pricing (USD per 1 million tokens)
     |--------------------------------------------------------------------------
     |
-    | Used to estimate per-sample cost from the SDK's Usage object. THIS TABLE
-    | IS MAINTAINED BY YOU — prices change and this package does not attempt
-    | to keep them current. Unknown provider/model combinations produce a null
-    | cost and a one-time console warning, never an error.
+    | Per-sample cost is estimated from the SDK's Usage object against a price
+    | table resolved in three layers, first match winning:
     |
-    | Keys per model: input, output, cache_read, cache_write (all optional
-    | except input/output). Reasoning tokens are billed at the output rate.
+    |   1. `pricing_overrides` below — yours, and always final.
+    |   2. config/evals-pricing.php — written by `php artisan evals:sync-pricing`
+    |      from vizra.ai, which tracks published prices daily. Run it once,
+    |      commit the file, and CI prices runs exactly as your laptop does.
+    |   3. `pricing` below — a handful of common models shipped with the
+    |      package so a fresh install still produces a number.
+    |
+    | Run the sync. This bottom layer is a floor, not a source of truth: it is
+    | six models on a day that is already in the past, and the cost of trusting
+    | it is finding out a suite bills 50% more than you were told.
+    |
+    | An unpriced model yields a null cost and one console warning, never an
+    | error. Keys per model: input, output, cache_read, cache_write (the last
+    | two optional; they fall back to the input rate, which is what providers
+    | without a cache tier charge). Reasoning tokens bill at the output rate.
     |
     */
+
+    'pricing_source' => env('VIZRA_PRICING_SOURCE', 'https://vizra.ai/api/v1/pricing/ai-models'),
+
+    /*
+     * Prices you want used no matter what the sync says — a negotiated rate,
+     * a self-hosted model, or a provider nobody publishes numbers for. Same
+     * shape as `pricing` below, and it beats both other layers.
+     */
+    'pricing_overrides' => [
+        // 'anthropic' => [
+        //     'claude-sonnet-5' => ['input' => 1.80, 'output' => 9.00],
+        // ],
+    ],
 
     'pricing' => [
         'anthropic' => [
             'claude-opus-5' => ['input' => 5.00, 'output' => 25.00, 'cache_read' => 0.50, 'cache_write' => 6.25],
-            'claude-sonnet-5' => ['input' => 3.00, 'output' => 15.00, 'cache_read' => 0.30, 'cache_write' => 3.75],
+            'claude-sonnet-5' => ['input' => 2.00, 'output' => 10.00, 'cache_read' => 0.20, 'cache_write' => 2.50],
             'claude-haiku-4-5' => ['input' => 1.00, 'output' => 5.00, 'cache_read' => 0.10, 'cache_write' => 1.25],
         ],
         'openai' => [

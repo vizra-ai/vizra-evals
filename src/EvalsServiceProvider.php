@@ -10,6 +10,7 @@ use Vizra\Evals\Console\MakeCommand;
 use Vizra\Evals\Console\PingCommand;
 use Vizra\Evals\Console\RunCommand;
 use Vizra\Evals\Console\RunnerCommand;
+use Vizra\Evals\Console\SyncPricingCommand;
 
 class EvalsServiceProvider extends ServiceProvider
 {
@@ -52,6 +53,7 @@ class EvalsServiceProvider extends ServiceProvider
                 BaselineCommand::class,
                 CalibrateCommand::class,
                 RunnerCommand::class,
+                SyncPricingCommand::class,
             ]);
         }
 
