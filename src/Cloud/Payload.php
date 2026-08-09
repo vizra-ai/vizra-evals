@@ -141,6 +141,25 @@ class Payload
                         'actual' => $assertion->actual,
                         'message' => $assertion->message,
                         'judge_reasoning' => $assertion->judge_reasoning,
+
+                        /*
+                         * What the judge itself spent.
+                         *
+                         * A judged suite can spend more on grading than on the
+                         * agent under test — on a small dataset with a large
+                         * judge, fifteen times more. Sending only the agent's
+                         * tokens means anything downstream that adds up token
+                         * counts is not slightly low, it is wrong by an order
+                         * of magnitude.
+                         *
+                         * Null on every deterministic assertion, which is most
+                         * of them.
+                         */
+                        'judge_combo_key' => isset($assertion->meta['judge_model'])
+                            ? ($assertion->meta['judge_provider'] ?? '?').'/'.$assertion->meta['judge_model']
+                            : null,
+                        'judge_usage' => $assertion->meta['judge_usage'] ?? null,
+                        'judge_cost' => $assertion->meta['judge_cost'] ?? null,
                     ])->all(),
             ];
         }
