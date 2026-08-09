@@ -3,6 +3,20 @@
 use Laravel\Ai\Responses\Data\Usage;
 use Vizra\Evals\Support\Pricing;
 
+/*
+ * Both advisories are "once per process" by design, which makes them sticky
+ * across tests sharing one. Reset rather than order the tests around it.
+ */
+beforeEach(function () {
+    $reset = function (string $property, mixed $value) {
+        $ref = new ReflectionProperty(Pricing::class, $property);
+        $ref->setValue(null, $value);
+    };
+
+    $reset('advised', false);
+    $reset('warned', []);
+});
+
 it('computes cost from the configured table', function () {
     $usage = new Usage(promptTokens: 1_000_000, completionTokens: 100_000);
 
@@ -136,40 +150,55 @@ it('bills a cached token at the input rate when a provider has no cache tier', f
 
 /*
 |--------------------------------------------------------------------------
-| Staleness
+| Where the price came from
 |--------------------------------------------------------------------------
 |
-| The failure mode of a synced table is not that it breaks. It is that nobody
-| re-syncs it and it keeps answering, confidently, with last year's numbers.
+| The failure mode is not breakage, it is a table nobody refreshes that keeps
+| answering confidently. One line per process, and only when there is
+| something to do about it.
 |
 */
 
 it('says nothing while the synced table is current', function () {
+    config()->set('evals-pricing.models', ['gpt-5' => ['input' => 1.25, 'output' => 10.0]]);
     config()->set('evals-pricing.published_at', now()->subDays(3)->format('Y-m-d H:i:s'));
 
-    expect(Pricing::staleWarning())->toBeNull();
+    expect(Pricing::advisory('openai', 'gpt-5'))->toBeNull();
 });
 
 it('mentions a synced table that has gone stale, once', function () {
+    config()->set('evals-pricing.models', ['gpt-5' => ['input' => 1.25, 'output' => 10.0]]);
     config()->set('evals-pricing.published_at', now()->subDays(200)->format('Y-m-d H:i:s'));
 
-    expect(Pricing::staleWarning())
+    expect(Pricing::advisory('openai', 'gpt-5'))
         ->toContain('200 days old')
         ->toContain('evals:sync-pricing');
 
     // Once per process. A line per sample would bury the run's output.
-    expect(Pricing::staleWarning())->toBeNull();
+    expect(Pricing::advisory('openai', 'gpt-5'))->toBeNull();
 });
 
-it('stays quiet when nothing has ever been synced', function () {
+it('says the bundled table is a fallback when nothing has been synced', function () {
     config()->set('evals-pricing', []);
 
-    // Handled already by the per-model warning; saying it twice helps nobody.
-    expect(Pricing::staleWarning())->toBeNull();
+    // The one case that used to be silent: a known model, a price found, and
+    // no indication it came from a table shipped months ago. shouldWarn()
+    // covers unknown models only, so gpt-5 and claude-sonnet-5 said nothing.
+    expect(Pricing::shouldWarn('openai', 'gpt-5'))->toBeFalse()
+        ->and(Pricing::advisory('openai', 'gpt-5'))->toContain('sync-pricing');
+});
+
+it('stays quiet about a price somebody set deliberately', function () {
+    config()->set('evals-pricing', []);
+    config()->set('evals.pricing_overrides.openai.gpt-5', ['input' => 0.5, 'output' => 4.0]);
+
+    // An override is a decision, not an oversight.
+    expect(Pricing::advisory('openai', 'gpt-5'))->toBeNull();
 });
 
 it('stays quiet rather than throwing on an unparseable stamp', function () {
+    config()->set('evals-pricing.models', ['gpt-5' => ['input' => 1.25, 'output' => 10.0]]);
     config()->set('evals-pricing.published_at', 'not a date');
 
-    expect(Pricing::staleWarning())->toBeNull();
+    expect(Pricing::advisory('openai', 'gpt-5'))->toBeNull();
 });

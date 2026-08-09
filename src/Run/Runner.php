@@ -264,10 +264,11 @@ class Runner
                 .'the pricing_overrides key of config/evals.php.';
         }
 
-        // Said once per process, not once per sample. A table synced a year
-        // ago is worse than no table, because it produces confident numbers.
-        if ($stale = Pricing::staleWarning()) {
-            $this->warnings[] = $stale;
+        // Where the price came from, when that is worth knowing. Once per
+        // process, not once per sample — a note on every row would bury the
+        // run's actual output.
+        if ($advisory = Pricing::advisory($response->meta->provider, $response->meta->model)) {
+            $this->warnings[] = $advisory;
         }
 
         return DB::transaction(function () use ($base, $verdict, $error, $response, $assertions) {

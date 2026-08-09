@@ -80,20 +80,43 @@ class Pricing
     /** How old a synced table may get before it is worth mentioning. */
     private const STALE_AFTER_DAYS = 60;
 
-    private static bool $staleReported = false;
+    private static bool $advised = false;
 
     /**
-     * One line, once per process, when the synced table has gone stale.
+     * At most one line per process about where prices are coming from.
      *
-     * A price table nobody re-syncs is the failure mode this whole mechanism
-     * has — it does not break, it just quietly keeps answering with last
-     * year's numbers, and a confident wrong cost is worse than a null one.
-     * Silent while a table is current, and silent when there is none at all,
-     * because that case already warns per model.
+     * The failure mode of this whole mechanism is not that it breaks. It is
+     * that a table quietly keeps answering with numbers nobody has refreshed,
+     * and a confident wrong cost invites no second look the way a null one
+     * does. Two ways that happens, and both need saying:
+     *
+     *  - **Never synced.** The prices in use are the handful bundled with the
+     *     package, correct on the day that file was written and ageing since.
+     *     This was silent, because the per-model warning covers an *unknown*
+     *     model and these six are known — so somebody running GPT-5 or Sonnet
+     *     and never syncing was the one case that got no warning at all.
+     *  - **Synced long ago.** Same problem with more models in it.
+     *
+     * Nothing is said when the price came from an override, because that is
+     * somebody stating a number deliberately, or when a current sync is in
+     * use, because then there is nothing to do.
      */
-    public static function staleWarning(): ?string
+    public static function advisory(?string $provider, ?string $model): ?string
     {
-        if (self::$staleReported) {
+        if (self::$advised) {
+            return null;
+        }
+
+        $source = self::sourceFor($provider, $model);
+
+        if ($source === 'bundled') {
+            self::$advised = true;
+
+            return 'Using the prices bundled with vizra/evals, which are a fallback and will '
+                .'be out of date — run `php artisan evals:sync-pricing` for current ones.';
+        }
+
+        if ($source !== 'synced') {
             return null;
         }
 
@@ -113,7 +136,7 @@ class Pricing
             return null;
         }
 
-        self::$staleReported = true;
+        self::$advised = true;
 
         return "Model prices are {$age} days old — run `php artisan evals:sync-pricing` to refresh them.";
     }
