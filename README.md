@@ -134,7 +134,8 @@ php artisan evals:sync-pricing        # writes config/evals-pricing.php
 ```
 
 It pulls published prices from vizra.ai, which tracks them daily, and writes
-them to `config/evals-pricing.php`. **Commit that file.** Writing prices to disk
+them to `config/evals-pricing.php` — a plain config file, no migration and no
+table in your database. **Commit it.** Writing prices to disk
 rather than calling an API mid-run means runs stay offline, CI prices a run
 exactly as your laptop did, and a change in what your evals cost arrives as a
 reviewable diff instead of a surprise. The endpoint is public and anonymous —

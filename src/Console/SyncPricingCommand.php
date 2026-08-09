@@ -87,6 +87,21 @@ class SyncPricingCommand extends Command
             count($table),
         ));
 
+        /*
+         * A cached config is read from bootstrap/cache, not from the file we
+         * just wrote — which is every production deployment. Without this the
+         * command reports success, changes the file, and changes nothing that
+         * runs: the single most confusing way for this to fail.
+         *
+         * Rebuilt rather than warned about, because finishing the job is what
+         * was asked for, and the cache is regenerated from the same
+         * environment this process is already running in.
+         */
+        if ($this->laravel->configurationIsCached()) {
+            $this->callSilently('config:cache');
+            $this->components->info('Config cache rebuilt, so the new prices are live.');
+        }
+
         return self::SUCCESS;
     }
 

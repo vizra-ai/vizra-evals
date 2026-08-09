@@ -25,6 +25,15 @@ afterEach(function () {
     if (is_file($this->path)) {
         unlink($this->path);
     }
+
+    // The cached-config test really does run `config:cache`, and the file it
+    // writes outlives the test. Left behind, every later test boots from a
+    // stale cache — which shows up as unrelated failures somewhere else.
+    $cached = $this->app->getCachedConfigPath();
+
+    if (is_file($cached)) {
+        unlink($cached);
+    }
 });
 
 function pricingSource(array $models, string $lastUpdated = '2026-08-08 02:00:00'): void
@@ -182,4 +191,30 @@ it('produces a table that resolves through Pricing end to end', function () {
 
     expect(Pricing::cost($usage, 'openai', 'gpt-4o'))->toEqualWithDelta(2.5, 0.0001)
         ->and(Pricing::sourceFor('openai', 'gpt-4o'))->toBe('synced');
+});
+
+it('rebuilds a cached config so the new prices are actually live', function () {
+    /*
+     * The production case, and the most confusing way this can fail: a cached
+     * config is read from bootstrap/cache rather than from the file the sync
+     * just wrote, so the command reports success and nothing that runs
+     * changes.
+     */
+    $this->app->instance('config_loaded_from_cache', true);
+
+    expect($this->app->configurationIsCached())->toBeTrue();
+
+    pricingSource(['gpt-5' => ['input_price_per_million' => 1.25, 'output_price_per_million' => 10.0]]);
+
+    $this->artisan('evals:sync-pricing')
+        ->expectsOutputToContain('Config cache rebuilt')
+        ->assertSuccessful();
+});
+
+it('says nothing about the config cache when there is not one', function () {
+    pricingSource(['gpt-5' => ['input_price_per_million' => 1.25, 'output_price_per_million' => 10.0]]);
+
+    $this->artisan('evals:sync-pricing')
+        ->doesntExpectOutputToContain('Config cache rebuilt')
+        ->assertSuccessful();
 });
