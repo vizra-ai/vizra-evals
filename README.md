@@ -15,11 +15,6 @@
   <a href="https://vizra.ai?utm_source=github&amp;utm_medium=readme&amp;utm_campaign=vizra-evals">vizra.ai</a>
 </p>
 
-<!--
-  Badges go live once vizra/evals is published to Packagist. Until then the
-  version and downloads shields render as a grey "not found", which reads worse
-  than no badge at all. Uncomment this block after the first tag is pushed.
-
 <p align="center">
   <a href="https://packagist.org/packages/vizra/evals"><img src="https://img.shields.io/packagist/v/vizra/evals" alt="Latest Version"></a>
   <a href="https://packagist.org/packages/vizra/evals"><img src="https://img.shields.io/packagist/dt/vizra/evals" alt="Total Downloads"></a>
@@ -27,7 +22,6 @@
   <a href="https://www.php.net"><img src="https://img.shields.io/badge/PHP-8.4%2B-777BB4.svg" alt="PHP"></a>
   <a href="https://laravel.com"><img src="https://img.shields.io/badge/Laravel-12.0%2B-FF2D20.svg" alt="Laravel"></a>
 </p>
--->
 
 Pest tells you whether your AI agent passed *today*. Vizra Evals records every run — sampled scores, pass rates, judge reasoning, tool calls, cost — so you can hold a baseline, fail CI on regressions, and watch quality trend over time in a dashboard. Built for agents on the official [Laravel AI SDK](https://github.com/laravel/ai).
 
