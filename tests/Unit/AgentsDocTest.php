@@ -42,9 +42,9 @@ function realAssertions(): array
 
         preg_match_all(
             // `protected`, because an Evaluation calls them on itself. Matching only
-        // `public` found nothing at all — and the first test still passed,
-        // because an empty list is a subset of anything.
-        '/(?:public|protected)\s+function\s+(assert[A-Z]\w*)\s*\(/',
+            // `public` found nothing at all — and the first test still passed,
+            // because an empty list is a subset of anything.
+            '/(?:public|protected)\s+function\s+(assert[A-Z]\w*)\s*\(/',
             file_get_contents($file->getPathname()),
             $m,
         );

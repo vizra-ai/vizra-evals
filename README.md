@@ -36,7 +36,7 @@ composer require vizra/evals --dev
 php artisan migrate
 ```
 
-Requires PHP 8.4+, Laravel 12+, `laravel/ai`, and Pest 5 for the testing surface (a standalone CLI exists too — see below).
+Requires PHP 8.4+, Laravel 12+, `laravel/ai`, and Pest 4 (Laravel 12) or Pest 5 (Laravel 13) for the testing surface (a standalone CLI exists too — see below).
 
 > **Install it as a regular dependency, not `--dev`, if you use Vizra Cloud's Run button.** That works by having `evals:runner` on your app's scheduler in the environment being evaluated, and `composer install --no-dev` leaves a dev requirement out. Reporting from CI is fine either way, since CI installs dev dependencies.
 
@@ -160,7 +160,7 @@ See [the CLI reference](https://docs.vizra.ai/evals/cli), [class-based evaluatio
 
 ## Testing your evals without spending tokens
 
-The SDK's fakes work end-to-end: `SupportBot::fake([...])` (plus `Ai::fakeAgent(JudgeAgent::class, ...)` if you use judges), then run the test with `PEST_EVALS=1`. Multi-turn rows route straight to a faked agent, and `assertPrompted()` sees every prompt. The package's own 148 tests run this way — no network, no keys.
+The SDK's fakes work end-to-end: `SupportBot::fake([...])` (plus `Ai::fakeAgent(JudgeAgent::class, ...)` if you use judges), then run the test with `PEST_EVALS=1`. Multi-turn rows route straight to a faked agent, and `assertPrompted()` sees every prompt. The package's own 197 tests run this way — no network, no keys.
 
 Full walkthrough: [testing without tokens](https://docs.vizra.ai/evals/testing-without-tokens).
 

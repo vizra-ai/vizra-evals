@@ -19,7 +19,8 @@ First public release.
 - Baseline comparison and per-row regression detection.
 - Run-level gates (`minScore`, `minPassRate`, `maxRegressions`) with an exit
   code CI can act on.
-- `evals:run`, `evals:make`, `evals:baseline`, `evals:calibrate`, `evals:runner`.
+- `evals:run`, `make:eval`, `evals:baseline`, `evals:calibrate`, `evals:runner`,
+  `evals:sync-pricing`, `evals:ping`.
 - Pest integration: write an eval as a test with `toPassEval()`.
 - Dry runs against faked agents, so an eval can be developed without spending
   tokens.
