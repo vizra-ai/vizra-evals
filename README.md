@@ -10,9 +10,9 @@
 
 <p align="center">
   <a href="https://docs.vizra.ai/evals/quickstart">Documentation</a> &middot;
-  <a href="https://vizra.ai/cloud">Vizra Cloud</a> &middot;
+  <a href="https://vizra.ai/cloud?utm_source=github&amp;utm_medium=readme&amp;utm_campaign=vizra-evals">Vizra Cloud</a> &middot;
   <a href="https://github.com/vizra-ai/vizra-evals-ui">Dashboard</a> &middot;
-  <a href="https://vizra.ai">vizra.ai</a>
+  <a href="https://vizra.ai?utm_source=github&amp;utm_medium=readme&amp;utm_campaign=vizra-evals">vizra.ai</a>
 </p>
 
 <!--
@@ -203,8 +203,8 @@ Schedule::command('evals:sync-pricing')->weekly();
 
 ## Vizra Cloud
 
-[Vizra Cloud](https://vizra.ai/cloud) is the hosted side of this package — free
-for one project, and [priced from there](https://vizra.ai/pricing). Local runs
+[Vizra Cloud](https://vizra.ai/cloud?utm_source=github&utm_medium=readme&utm_campaign=vizra-evals) is the hosted side of this package — free
+for one project, and [priced from there](https://vizra.ai/pricing?utm_source=github&utm_medium=readme&utm_campaign=vizra-evals). Local runs
 live in your own database, which means baselines live on whoever's laptop set
 them and CI has no history at all. Set one variable and every finished run is
 also pushed to the hosted dashboard:
@@ -298,6 +298,6 @@ MIT. See [LICENSE.md](LICENSE.md).
 <p align="center">
   <strong>Stop shipping agent regressions you can't see.</strong><br>
   <a href="https://docs.vizra.ai/evals/quickstart">Read the quickstart →</a> &middot;
-  <a href="https://vizra.ai/cloud">Try Vizra Cloud →</a> &middot;
+  <a href="https://vizra.ai/cloud?utm_source=github&amp;utm_medium=readme&amp;utm_campaign=vizra-evals">Try Vizra Cloud →</a> &middot;
   <a href="https://github.com/vizra-ai/vizra-evals-ui">Self-host the dashboard →</a>
 </p>
