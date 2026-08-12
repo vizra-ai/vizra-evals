@@ -1,6 +1,33 @@
-# Vizra Evals
+<p align="center">
+  <img src="https://vizra.ai/img/vizra-logo.svg" alt="Vizra" width="180">
+</p>
 
-**Write agent evals as Pest tests. Keep every result.**
+<h1 align="center">Vizra Evals</h1>
+
+<p align="center">
+  <strong>Write agent evals as Pest tests. Keep every result.</strong>
+</p>
+
+<p align="center">
+  <a href="https://docs.vizra.ai/evals/quickstart">Documentation</a> &middot;
+  <a href="https://vizra.ai/cloud">Vizra Cloud</a> &middot;
+  <a href="https://github.com/vizra-ai/vizra-evals-ui">Dashboard</a> &middot;
+  <a href="https://vizra.ai">vizra.ai</a>
+</p>
+
+<!--
+  Badges go live once vizra/evals is published to Packagist. Until then the
+  version and downloads shields render as a grey "not found", which reads worse
+  than no badge at all. Uncomment this block after the first tag is pushed.
+
+<p align="center">
+  <a href="https://packagist.org/packages/vizra/evals"><img src="https://img.shields.io/packagist/v/vizra/evals" alt="Latest Version"></a>
+  <a href="https://packagist.org/packages/vizra/evals"><img src="https://img.shields.io/packagist/dt/vizra/evals" alt="Total Downloads"></a>
+  <a href="LICENSE.md"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
+  <a href="https://www.php.net"><img src="https://img.shields.io/badge/PHP-8.4%2B-777BB4.svg" alt="PHP"></a>
+  <a href="https://laravel.com"><img src="https://img.shields.io/badge/Laravel-12.0%2B-FF2D20.svg" alt="Laravel"></a>
+</p>
+-->
 
 Pest tells you whether your AI agent passed *today*. Vizra Evals records every run — sampled scores, pass rates, judge reasoning, tool calls, cost — so you can hold a baseline, fail CI on regressions, and watch quality trend over time in a dashboard. Built for agents on the official [Laravel AI SDK](https://github.com/laravel/ai).
 
@@ -63,7 +90,9 @@ Gate failed: 2 rows regressed against the reference run (allowed: 0).
   ↓ regressed: "Can I return it?" 93.3% → 55.0%
 ```
 
-**5. Watch it over time** — install [`vizra/evals-ui`](../vizra-evals-ui) and visit `/evals` for score trends, per-sample drill-downs with judge reasoning, and run comparisons.
+**5. Watch it over time** — install [`vizra/evals-ui`](https://github.com/vizra-ai/vizra-evals-ui) and visit `/evals` for score trends, per-sample drill-downs with judge reasoning, and run comparisons.
+
+Longer version of all five steps, with the reasoning: [the quickstart](https://docs.vizra.ai/evals/quickstart).
 
 ## Inline assertions
 
@@ -77,6 +106,8 @@ Inside `->assert(fn ($a, $row, $response) => ...)`, methods are chainable, and a
 
 Custom checks implement `Vizra\Evals\Assertions\Assertion` and run via `$a->with(new MyAssertion(...))` — or subclass `Evaluation` for the full authoring surface and point the test at it with `->using(SupportQuality::class)`.
 
+Every assertion, with signatures and worked examples: [the assertion reference](https://docs.vizra.ai/evals/assertions).
+
 ## The judge
 
 `->judge($criteria, min: 7)` runs a structured-output judge agent — `{score: 1–10, reasoning}` — no regex response parsing anywhere. Reasoning is persisted per sample (it's the debugging payload). Options: `dimensions: ['accuracy' => 7, 'tone' => 6]`, `provider:`/`model:` (point the judge at a *different model family* than the agent under test — models grade their own family leniently), `using: MyJudge::class`.
@@ -86,6 +117,8 @@ Don't trust an uncalibrated judge — feed it human-labelled data and measure ag
 ```bash
 php artisan evals:calibrate storage/labelled.jsonl --criteria="Correctness"
 ```
+
+More on [writing judges](https://docs.vizra.ai/evals/judge) and [calibrating them](https://docs.vizra.ai/evals/calibration).
 
 ## Datasets
 
@@ -101,9 +134,13 @@ php artisan evals:calibrate storage/labelled.jsonl --criteria="Correctness"
 
 `fromConversations()` turns stored conversations into multi-turn rows: latest user turn becomes the prompt, prior turns replay, and the reply your agent actually gave becomes `$row->expected()`. Rows carry a content hash, so the same logical row is tracked across runs even when files are reordered.
 
+See [datasets](https://docs.vizra.ai/evals/datasets) and [multi-turn evals](https://docs.vizra.ai/evals/multi-turn).
+
 ## Scoring model
 
 Deterministic assertions score 1/0, judge scores normalize to 0–1, weights apply. A failed gate zeroes the sample. Row result = pass rate + score mean/stddev across samples; run result aggregates rows. Pass/fail is a **run-level policy** (`->gate(minScore:, minPassRate:, maxRegressions:)`), not a per-assertion verdict. Comparisons join rows across runs by content hash; a score drop within `evals.compare.epsilon` (default 0.05) is jitter, not a regression — pass-rate drops always count.
+
+Worked through in full under [scoring](https://docs.vizra.ai/evals/scoring) and [baselines and regressions](https://docs.vizra.ai/evals/baselines-and-regressions).
 
 ## Beyond the test suite
 
@@ -119,9 +156,13 @@ php artisan make:eval SupportQuality              # scaffold a class + dataset
 
 Class-based `Evaluation`s add `across()` model matrices (each provider/model combo becomes its own series), `transform()` hooks, and are what the dashboard's Run button executes. Exit codes: `0` pass, `1` gate/regression failure, `2` harness failure.
 
+See [the CLI reference](https://docs.vizra.ai/evals/cli), [class-based evaluations](https://docs.vizra.ai/evals/class-based-evaluations) and [running in CI](https://docs.vizra.ai/evals/ci).
+
 ## Testing your evals without spending tokens
 
 The SDK's fakes work end-to-end: `SupportBot::fake([...])` (plus `Ai::fakeAgent(JudgeAgent::class, ...)` if you use judges), then run the test with `PEST_EVALS=1`. Multi-turn rows route straight to a faked agent, and `assertPrompted()` sees every prompt. The package's own 148 tests run this way — no network, no keys.
+
+Full walkthrough: [testing without tokens](https://docs.vizra.ai/evals/testing-without-tokens).
 
 ## Keeping cost estimates honest
 
@@ -162,9 +203,11 @@ Schedule::command('evals:sync-pricing')->weekly();
 
 ## Vizra Cloud
 
-Local runs live in your own database, which means baselines live on whoever's
-laptop set them and CI has no history at all. Set one variable and every
-finished run is also pushed to the hosted dashboard:
+[Vizra Cloud](https://vizra.ai/cloud) is the hosted side of this package — free
+for one project, and [priced from there](https://vizra.ai/pricing). Local runs
+live in your own database, which means baselines live on whoever's laptop set
+them and CI has no history at all. Set one variable and every finished run is
+also pushed to the hosted dashboard:
 
 ```bash
 VIZRA_CLOUD_KEY=vz_...
@@ -236,7 +279,7 @@ said.
 
 ## Configuration
 
-`php artisan vendor:publish --tag=evals-config` — judge defaults, gate defaults, comparison epsilon, concurrency, table prefix and pricing (see below). An unpriced model costs `null` plus one warning, never an error.
+`php artisan vendor:publish --tag=evals-config` — judge defaults, gate defaults, comparison epsilon, concurrency, table prefix and pricing (see below). An unpriced model costs `null` plus one warning, never an error. Every key is documented under [configuration](https://docs.vizra.ai/evals/configuration).
 
 ## Coming from vizra-adk or pest-plugin-evals?
 
@@ -244,6 +287,17 @@ From **vizra-adk**: `$agentName`/`Agent::run()` → a `laravel/ai` agent target;
 
 From **pest-plugin-evals**: the two coexist in one file — Nuno's expectations are quick unrecorded text checks; `toPassEval()` is for datasets, sampling, real tool-call assertions, multi-turn, and everything you want recorded.
 
+Both written up at length: [coming from vizra-adk](https://docs.vizra.ai/evals/migrate-from-vizra-adk) and [vs. pest-plugin-evals](https://docs.vizra.ai/evals/vs-pest-plugin-evals).
+
 ## License
 
 MIT. See [LICENSE.md](LICENSE.md).
+
+---
+
+<p align="center">
+  <strong>Stop shipping agent regressions you can't see.</strong><br>
+  <a href="https://docs.vizra.ai/evals/quickstart">Read the quickstart →</a> &middot;
+  <a href="https://vizra.ai/cloud">Try Vizra Cloud →</a> &middot;
+  <a href="https://github.com/vizra-ai/vizra-evals-ui">Self-host the dashboard →</a>
+</p>
