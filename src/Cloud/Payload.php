@@ -121,6 +121,18 @@ class Payload
                 // travels under the same `samples` switch and no other.
                 'messages' => $sample->messages,
                 'expected' => $sample->expected,
+                // The row's own meta — every dataset key that is not input,
+                // messages or expected.
+                //
+                // Sent because the hosted dashboard rebuilds an editable
+                // dataset from these samples, and hands that dataset back to
+                // the runner when someone clicks Run. Without meta the rebuilt
+                // dataset is not the dataset that was run: any evaluation
+                // branching on `$row->meta(...)` silently takes the other
+                // branch. A suite scoring 95% locally errored on every sample
+                // when triggered from the dashboard, because four rows marked
+                // `should_refuse` arrived without it.
+                'meta' => $sample->meta,
                 'response_text' => $sample->response_text,
                 'structured_output' => $sample->structured_output,
                 'tool_calls' => $sample->tool_calls,
