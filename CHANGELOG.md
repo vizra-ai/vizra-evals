@@ -6,6 +6,20 @@ This project follows [semantic versioning](https://semver.org). While on 0.x,
 breaking changes may land in a minor release — they will always be called out
 here.
 
+## 0.2.1 — 2026-08-13
+
+A dataset row's own keys now survive the round trip to the hosted dashboard.
+
+### Fixed
+
+- `meta` was missing from every sample in the cloud payload. The dashboard
+  rebuilds an editable dataset from those samples and hands it back to the
+  runner when someone clicks Run, so a rebuilt row arrived without the keys the
+  evaluation branches on — every `$row->meta(...)` check silently took the
+  other branch. A suite scoring 95% locally errored on all of them when
+  triggered from the dashboard. No migration: the column already existed and
+  was already being written, only the payload left it out.
+
 ## 0.2.0 — 2026-08-12
 
 Prices now come from a table you sync, and multi-turn rows and judge spend
