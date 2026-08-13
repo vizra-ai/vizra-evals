@@ -6,6 +6,52 @@ This project follows [semantic versioning](https://semver.org). While on 0.x,
 breaking changes may land in a minor release — they will always be called out
 here.
 
+## 0.3.0 — 2026-08-13
+
+The judge now reads the same instructions as the agent it is grading, and a
+run that could not have failed says so.
+
+### Added
+
+- The judge is given the target agent's system prompt automatically. Without
+  it, an agent doing exactly what it was told to do reads as invention: on an
+  11-row suite, every failure was the agent offering to hand a question to a
+  human — which its instructions require — being marked "invents a
+  capability". The only workaround was pasting the whole system prompt into
+  every criteria and keeping the two in step by hand. Resolved once per
+  evaluation, not per sample, and skipped for a `Closure` target or an agent
+  that will not resolve.
+- `withoutTargetInstructions()` on the judge builder, for criteria that are
+  deliberately about the response alone — tone, reading age, format — where
+  the system prompt would only bias the grade or cost tokens.
+- A warning when a run passes a gate that asserts nothing. With no
+  `minScore`, no `minPassRate` and no comparison, every run passes, including
+  one where every sample failed — which reads as a green build to anyone who
+  wired it into CI without setting a threshold.
+- A warning when `--compare` is given a run of one sample per row. There is no
+  distribution to compare, so ordinary run-to-run variance reports as
+  regression: three rows were flagged whose scores had merely moved 100→80 on
+  identical inputs. Warned rather than refused — the numbers are real even
+  when the verdict is not trustworthy.
+
+### Changed
+
+- **Judged scores will move.** The judge sees the target's instructions on
+  every `judge()` call it did not previously see, so a suite re-run after
+  upgrading may score differently — generally higher, where failures were the
+  judge not knowing what the agent was permitted to do. Re-baseline before
+  reading a comparison across the upgrade.
+- `make:eval` writes a starter dataset of four rows rather than two, showing
+  `expected.any` and a row the agent should refuse. A dataset of questions the
+  agent can obviously answer proves only that the API is up.
+- The generated evaluation prefers `expected.any` where the dataset provides
+  it, and points `target()` at `app/Ai/Agents`, which is where
+  `make:agent` actually writes agents. Matching model prose on one exact
+  string fails on an en dash.
+- `.claude` is kept out of the release tarball. It holds this package's own
+  maintainer skills; shipped, a consumer's coding agent loaded them on startup
+  and offered to cut *our* releases.
+
 ## 0.2.1 — 2026-08-13
 
 A dataset row's own keys now survive the round trip to the hosted dashboard.

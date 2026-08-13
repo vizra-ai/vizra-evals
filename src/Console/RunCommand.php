@@ -174,7 +174,7 @@ class RunCommand extends Command
                 JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
             ));
         } else {
-            $this->renderSummary($run, $result, $comparison, $gateOutcome);
+            $this->renderSummary($run, $result, $comparison, $gateOutcome, $gate);
         }
 
         return $gateOutcome['passed'] ? self::SUCCESS : self::EXIT_GATE_FAILED;
@@ -219,6 +219,26 @@ class RunCommand extends Command
 
         if ($baseline === null) {
             return [null, "No reference run found for --compare={$reference}."];
+        }
+
+        /*
+         * One sample per row makes a comparison meaningless.
+         *
+         * A regression is "this row got worse", and with a single sample there
+         * is no distribution to compare — ordinary run-to-run variance shows up
+         * as a regression. Observed: three rows reported as regressed when
+         * their scores had merely moved 100→80 on identical inputs, which the
+         * 0.05 epsilon cannot absorb.
+         *
+         * Warned rather than refused: someone may genuinely want the diff, and
+         * the numbers are real even when the verdict is not trustworthy.
+         */
+        if (($run->total_samples ?? 0) > 0 && $run->total_rows > 0
+            && intdiv($run->total_samples, max($run->total_rows, 1)) < 2) {
+            $this->components->warn(
+                'Comparing a run of one sample per row. Nondeterminism will read as regression — '
+                .'raise $samples (or pass --samples=3) before trusting this verdict.'
+            );
         }
 
         return [Comparator::compare($run, $baseline), null];
@@ -287,7 +307,7 @@ class RunCommand extends Command
         });
     }
 
-    private function renderSummary(EvalRun $run, RunResult $result, ?Comparison $comparison, array $gateOutcome): void
+    private function renderSummary(EvalRun $run, RunResult $result, ?Comparison $comparison, array $gateOutcome, ?Gate $gate = null): void
     {
         $summary = $result->summary;
 
@@ -346,6 +366,21 @@ class RunCommand extends Command
 
         if ($gateOutcome['passed']) {
             $this->components->info('Gate passed.');
+
+            /*
+             * "Gate passed" with nothing to pass is not a result.
+             *
+             * With no minScore, no minPassRate and no comparison, every run
+             * passes — including one where every sample failed. Someone who
+             * wired this into CI without setting a threshold reads green and
+             * concludes their agent is fine.
+             */
+            if ($gate !== null && ! $gate->constrainsScore() && $comparison === null) {
+                $this->components->warn(
+                    'No gate was configured, so this run could not fail. Set gatePolicy(), '
+                    .'evals.gate in config, or pass --min-score to make it mean something.'
+                );
+            }
         } else {
             $this->components->error('Gate failed: '.implode('; ', $gateOutcome['failures']));
         }

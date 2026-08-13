@@ -28,6 +28,10 @@ abstract class Evaluation
      */
     public int $samples = 1;
 
+    private ?string $targetInstructions = null;
+
+    private bool $targetInstructionsResolved = false;
+
     /**
      * What gets invoked: a Laravel\Ai agent class-string, an agent
      * instance, or a Closure(Row $row): AgentResponse.
@@ -153,7 +157,30 @@ abstract class Evaluation
             default => $this->response()->text,
         };
 
-        return $this->collectorOrFail()->deferJudge(new JudgeBuilder($subject, $this->row()));
+        return $this->collectorOrFail()->deferJudge(
+            (new JudgeBuilder($subject, $this->row()))->forTarget($this->targetInstructions())
+        );
+    }
+
+    /**
+     * The system prompt of whatever this evaluation is testing.
+     *
+     * Resolved once per evaluation instance, not per judged sample: a suite
+     * of 30 rows would otherwise build the agent 30 times to read the same
+     * string. Null for a Closure target, or if the target cannot be resolved —
+     * in which case the judge simply grades as it did before.
+     */
+    private function targetInstructions(): ?string
+    {
+        if (! $this->targetInstructionsResolved) {
+            $this->targetInstructionsResolved = true;
+            $this->targetInstructions = rescue(
+                fn () => Target::from($this->target())->instructions(),
+                report: false,
+            );
+        }
+
+        return $this->targetInstructions;
     }
 
     /**

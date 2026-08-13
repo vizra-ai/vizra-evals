@@ -4,6 +4,10 @@
 /.github            export-ignore
 /.gitattributes     export-ignore
 /.gitignore         export-ignore
+# The maintainer skills for this package — the release process, not
+# anything a consumer needs. Shipped, a customer's coding agent loads them on
+# startup and reports "1 skill available" for cutting OUR releases.
+/.claude            export-ignore
 /CONTRIBUTING.md    export-ignore
 /phpunit.xml        export-ignore
 /tests              export-ignore

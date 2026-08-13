@@ -45,6 +45,26 @@ final class Target
         return $this->closure !== null;
     }
 
+    /**
+     * The system prompt the agent under test runs with, if it has one.
+     *
+     * Handed to the judge so it grades against the rules the agent was
+     * actually given rather than guessing at them. Null for a Closure target,
+     * which has no instructions to read, and null if resolving the agent
+     * throws — a judge without context is a worse grade, not a failed run.
+     */
+    public function instructions(): ?string
+    {
+        $agent = $this->agentInstance
+            ?? ($this->agentClass !== null ? rescue(fn () => app($this->agentClass), report: false) : null);
+
+        if (! $agent instanceof Agent) {
+            return null;
+        }
+
+        return rescue(fn () => trim((string) $agent->instructions()) ?: null, report: false);
+    }
+
     public function agentClass(): ?string
     {
         return $this->agentClass ?? ($this->agentInstance !== null ? $this->agentInstance::class : null);

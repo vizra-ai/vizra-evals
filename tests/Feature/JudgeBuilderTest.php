@@ -1,6 +1,7 @@
 <?php
 
 use Laravel\Ai\Ai;
+use Laravel\Ai\Prompts\AgentPrompt;
 use Laravel\Ai\Responses\AgentResponse;
 use Laravel\Ai\Responses\Data\Meta;
 use Laravel\Ai\Responses\Data\Usage;
@@ -156,4 +157,44 @@ it('scores tie as 0.5 and failed when a preference is stated', function () {
 
     expect($judge->status)->toBe('failed')
         ->and($judge->score)->toEqualWithDelta(0.5, 0.0001);
+});
+
+/*
+ * The judge grades against the rules the agent was actually given.
+ *
+ * Without them it has only the criteria, the input and the output — so an
+ * agent doing exactly what its system prompt told it to do reads as invention.
+ * Measured on a real suite: every failure in an 11-row run was the agent
+ * offering to pass a question to a human, which its instructions require, being
+ * marked "invents a capability". The workaround was pasting the whole system
+ * prompt into every criteria and keeping the two in step by hand.
+ */
+it('puts the target agent\'s instructions in front of the judge', function () {
+    Ai::fakeAgent(JudgeAgent::class, fn () => ['score' => 9, 'reasoning' => 'Fine.']);
+
+    $eval = judgeEvaluation(function ($row, $response) {
+        $this->judge()->criteria('Accurate.')->minScore(7);
+    });
+
+    (new Runner(concurrencyOverride: 1))->run($eval);
+
+    JudgeAgent::assertPrompted(fn (AgentPrompt $prompt) => str_contains(
+        $prompt->prompt,
+        'You are a helpful customer support agent for an online store.'
+    ));
+});
+
+it('can be told to grade the response alone', function () {
+    Ai::fakeAgent(JudgeAgent::class, fn () => ['score' => 9, 'reasoning' => 'Fine.']);
+
+    $eval = judgeEvaluation(function ($row, $response) {
+        $this->judge()->criteria('Reads at a ninth-grade level.')->withoutTargetInstructions()->minScore(7);
+    });
+
+    (new Runner(concurrencyOverride: 1))->run($eval);
+
+    JudgeAgent::assertPrompted(fn (AgentPrompt $prompt) => ! str_contains(
+        $prompt->prompt,
+        'You are a helpful customer support agent'
+    ));
 });

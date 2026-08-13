@@ -49,6 +49,19 @@ final class Gate
     }
 
     /**
+     * Does this gate assert anything about the run on its own?
+     *
+     * `maxRegressions` does not count: it only bites when there is something
+     * to compare against. A gate with neither threshold set passes every run,
+     * including one where every sample failed — which reads as a green build
+     * to anyone who wired it into CI without setting a threshold.
+     */
+    public function constrainsScore(): bool
+    {
+        return $this->minScore !== null || $this->minPassRate !== null;
+    }
+
+    /**
      * @return array{passed: bool, failures: array<int, string>}
      */
     public function evaluate(RunResult $result, ?Comparison $comparison = null): array

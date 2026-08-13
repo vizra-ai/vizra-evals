@@ -21,7 +21,8 @@ class {{ class }} extends Evaluation
      */
     public function target(): mixed
     {
-        return \App\Agents\MyAgent::class;
+        // `php artisan make:agent` writes agents to app/Ai/Agents.
+        return \App\Ai\Agents\MyAgent::class;
     }
 
     public function dataset(): Dataset
@@ -31,7 +32,7 @@ class {{ class }} extends Evaluation
         // Also available:
         // Dataset::fromCsv(base_path('evals/data/{{ dataFile }}.csv'));
         // Dataset::fromArray([['input' => '...', 'expected' => '...']]);
-        // Dataset::fromConversations(\App\Agents\MyAgent::class)->latest()->take(50);
+        // Dataset::fromConversations(\App\Ai\Agents\MyAgent::class)->latest()->take(50);
     }
 
     /**
@@ -51,11 +52,27 @@ class {{ class }} extends Evaluation
         // the sample and skips the (expensive) judge below.
         $this->assertNotEmpty()->gate();
 
-        if ($row->expected() !== null) {
+        /*
+         * Matching model prose exactly is a losing game: a dataset asking for
+         * "2-3 working days" fails on a reply that writes "2–3" with an en
+         * dash. List the spellings that all mean the same thing instead.
+         *
+         * In the dataset: {"input": "...", "expected": {"any": ["30 days", "thirty days"]}}
+         */
+        if (is_array($row->expected('any'))) {
+            $this->assertContainsAnyOf($row->expected('any'));
+        } elseif ($row->expected() !== null) {
             $this->assertContains($row->expected());
         }
 
-        // LLM-judged quality, scored 1-10 with persisted reasoning:
+        /*
+         * LLM-judged quality, scored 1-10 with the reasoning persisted.
+         *
+         * The judge is given the target agent's own instructions automatically,
+         * so it can tell a documented behaviour from an invented one. Write the
+         * criteria about what a good answer looks like — not about the rules
+         * the agent already has.
+         */
         $this->judge()
             ->criteria('Answers the question accurately without inventing details.')
             ->minScore(7);
