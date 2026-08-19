@@ -218,8 +218,33 @@ it('prefers the CI branch over a detached HEAD', function () {
     }
 });
 
+/**
+ * Every CI variable is cleared for the duration, including the bare `CI` that
+ * all of them set.
+ *
+ * This is the one test asserting the *absence* of CI, and it runs inside our
+ * own CI, where GITHUB_ACTIONS is set by the runner — so it passed on every
+ * laptop and failed on every push, which is the worst way for a badge to be
+ * red. Restored afterwards rather than left unset: the process is shared with
+ * every test that follows.
+ */
 it('files a local run under the app environment', function () {
-    expect(Environment::name())->toBe('testing');
+    $saved = [];
+
+    foreach (['CI', 'GITHUB_ACTIONS', 'GITLAB_CI', 'CIRCLECI', 'BUILDKITE'] as $var) {
+        $saved[$var] = getenv($var);
+        putenv($var);
+    }
+
+    try {
+        expect(Environment::name())->toBe('testing');
+    } finally {
+        foreach ($saved as $var => $value) {
+            if ($value !== false) {
+                putenv("{$var}={$value}");
+            }
+        }
+    }
 });
 
 /*
