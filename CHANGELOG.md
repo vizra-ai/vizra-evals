@@ -6,6 +6,22 @@ This project follows [semantic versioning](https://semver.org). While on 0.x,
 breaking changes may land in a minor release — they will always be called out
 here.
 
+## 0.3.1 — 2026-08-25
+
+Packaging only. No code changed, and nothing needs updating for it.
+
+### Changed
+
+- Widened the Packagist keywords. Packagist search matches on name,
+  description and keywords only — never the README — so the terms someone
+  looking for this package would actually type had no way to reach it:
+  `pest`, `laravel-ai-sdk`, `llm-evaluation`, `ai-agents`. The previous set
+  described what the package is rather than what a person searching for it
+  would call it. Keywords are read from the tagged release rather than the
+  default branch, which is the only reason this is a release at all.
+- Lowercased `Evaluation`, which displayed capitalised against every other
+  keyword.
+
 ## 0.3.0 — 2026-08-13
 
 The judge now reads the same instructions as the agent it is grading, and a
