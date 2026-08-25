@@ -7,7 +7,13 @@
         "evals",
         "evaluation",
         "llm",
-        "testing"
+        "testing",
+        "pest",
+        "ai-agents",
+        "llm-evaluation",
+        "laravel-ai-sdk",
+        "agent-evaluation",
+        "llm-testing"
     ],
     "license": "MIT",
     "homepage": "https://vizra.ai",
