@@ -6,6 +6,17 @@ This project follows [semantic versioning](https://semver.org). While on 0.x,
 breaking changes may land in a minor release — they will always be called out
 here.
 
+## 0.3.2 — 2026-09-05
+
+Documentation only. No code changed, and nothing needs updating for it.
+
+### Added
+
+- The README now mentions that the author takes on a small number of
+  fixed-price engagements to write a first suite, with a link to
+  vizra.ai/services. It says the work lands in your repo and changes nothing
+  about what the package or Vizra Cloud can see.
+
 ## 0.3.1 — 2026-08-25
 
 Packaging only. No code changed, and nothing needs updating for it.
