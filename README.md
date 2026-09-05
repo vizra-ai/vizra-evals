@@ -283,6 +283,14 @@ From **pest-plugin-evals**: the two coexist in one file — Nuno's expectations 
 
 Both written up at length: [coming from vizra-adk](https://docs.vizra.ai/evals/migrate-from-vizra-adk) and [vs. pest-plugin-evals](https://docs.vizra.ai/evals/vs-pest-plugin-evals).
 
+## Want the first suite written for you?
+
+The author takes on a small number of fixed-price engagements: a half-day
+review of what to test first, or a four-week sprint that leaves a suite built
+from your real traffic passing in your CI. Everything lands in your repo under
+MIT; nothing here changes what the package or Vizra Cloud can see.
+[vizra.ai/services](https://vizra.ai/services?utm_source=github&utm_medium=readme&utm_campaign=vizra-evals).
+
 ## License
 
 MIT. See [LICENSE.md](LICENSE.md).
@@ -293,5 +301,6 @@ MIT. See [LICENSE.md](LICENSE.md).
   <strong>Stop shipping agent regressions you can't see.</strong><br>
   <a href="https://docs.vizra.ai/evals/quickstart">Read the quickstart →</a> &middot;
   <a href="https://vizra.ai/cloud?utm_source=github&amp;utm_medium=readme&amp;utm_campaign=vizra-evals">Try Vizra Cloud →</a> &middot;
-  <a href="https://github.com/vizra-ai/vizra-evals-ui">Self-host the dashboard →</a>
+  <a href="https://github.com/vizra-ai/vizra-evals-ui">Self-host the dashboard →</a> &middot;
+  <a href="https://vizra.ai/services?utm_source=github&amp;utm_medium=readme&amp;utm_campaign=vizra-evals">Have it written for you →</a>
 </p>
